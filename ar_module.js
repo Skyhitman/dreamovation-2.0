@@ -45,55 +45,111 @@
       document.head.appendChild(style);
     }
     style.textContent = `
-      /* Video feed from AR.js webcam */
-      video#arjs-video, .arjs-video {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        object-fit: cover !important;
-        z-index: 91000 !important;
-        pointer-events: none !important;
-        display: block !important;
-        background: #000 !important;
-      }
-      /* Transparent A-Frame scene container overlay */
-      #skillsafe-ar-scene-container {
+      /* Hide all standard web app containers while AR is running */
+      body.in-ar-session {
+        margin: 0 !important;
+        padding: 0 !important;
+        padding-top: 0 !important;
+        overflow: hidden !important;
+        background: #000000 !important;
         position: fixed !important;
         inset: 0 !important;
         width: 100vw !important;
         height: 100vh !important;
-        z-index: 91002 !important;
+      }
+      body.in-ar-session #app,
+      body.in-ar-session nav,
+      body.in-ar-session #main-nav,
+      body.in-ar-session header,
+      body.in-ar-session #cwrap,
+      body.in-ar-session #mobile-nav-drawer,
+      body.in-ar-session #mobile-nav-backdrop,
+      body.in-ar-session #google_translate_element,
+      body.in-ar-session .sb {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+
+      /* Camera video from AR.js webcam: forced 100% full bleed on phone & desktop */
+      body.in-ar-session video#arjs-video,
+      body.in-ar-session .arjs-video,
+      body.in-ar-session video,
+      video#arjs-video {
+        position: fixed !important;
+        top: 0px !important;
+        left: 0px !important;
+        right: 0px !important;
+        bottom: 0px !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        min-width: 100vw !important;
+        min-height: 100vh !important;
+        max-width: 100vw !important;
+        max-height: 100vh !important;
+        margin: 0px !important;
+        margin-left: 0px !important;
+        margin-top: 0px !important;
+        padding: 0px !important;
+        object-fit: cover !important;
+        z-index: 10 !important;
+        pointer-events: none !important;
+        display: block !important;
+        background: #000000 !important;
+      }
+
+      /* Transparent A-Frame scene container overlay */
+      body.in-ar-session #skillsafe-ar-scene-container {
+        position: fixed !important;
+        inset: 0px !important;
+        top: 0px !important;
+        left: 0px !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        margin: 0px !important;
+        padding: 0px !important;
+        z-index: 20 !important;
         background: transparent !important;
         pointer-events: none !important;
         overflow: hidden !important;
       }
-      #skillsafe-ar-scene-container a-scene {
+      body.in-ar-session #skillsafe-ar-scene-container a-scene {
         position: fixed !important;
-        inset: 0 !important;
+        top: 0px !important;
+        left: 0px !important;
         width: 100vw !important;
         height: 100vh !important;
+        margin: 0px !important;
+        padding: 0px !important;
         background: transparent !important;
       }
-      #skillsafe-ar-scene-container canvas.a-canvas {
+      body.in-ar-session #skillsafe-ar-scene-container canvas.a-canvas {
         position: fixed !important;
-        inset: 0 !important;
+        top: 0px !important;
+        left: 0px !important;
         width: 100vw !important;
         height: 100vh !important;
+        margin: 0px !important;
+        margin-left: 0px !important;
+        margin-top: 0px !important;
+        padding: 0px !important;
         background: transparent !important;
         pointer-events: auto !important;
       }
+
       /* Top & Bottom HUD Layer */
-      #skillsafe-ar-hud-overlay {
+      body.in-ar-session #skillsafe-ar-hud-overlay {
         position: fixed !important;
-        inset: 0 !important;
-        z-index: 91005 !important;
+        inset: 0px !important;
+        top: 0px !important;
+        left: 0px !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        margin: 0px !important;
+        z-index: 30 !important;
         pointer-events: none !important;
-      }
-      /* Prevent parent scrolling during AR */
-      body.in-ar-session {
-        overflow: hidden !important;
+        box-sizing: border-box !important;
       }
     `;
   }
@@ -143,6 +199,11 @@
   // -----------------------------------------------------------------------
   window.exitARSession = function() {
     console.log("[SkillSafe AR] Terminating AR Session & cleaning up hardware...");
+
+    if (window._arWatchdogTimer) {
+      clearInterval(window._arWatchdogTimer);
+      window._arWatchdogTimer = null;
+    }
 
     // 1. Stop all video streams from all sources
     if (AR_STATE.stream) {
@@ -198,6 +259,22 @@
     document.documentElement.style.overflow = '';
     const htmlEl = document.querySelector('html');
     if (htmlEl) htmlEl.classList.remove('a-fullscreen');
+
+    // Restore standard UI containers
+    const appEl = document.getElementById('app');
+    if (appEl) {
+      appEl.style.display = '';
+      appEl.style.visibility = '';
+    }
+    const navEl = document.getElementById('main-nav');
+    if (navEl) {
+      navEl.style.display = '';
+      navEl.style.visibility = '';
+    }
+    const cwrapEl = document.getElementById('cwrap');
+    if (cwrapEl) {
+      cwrapEl.style.display = '';
+    }
 
     AR_STATE.active = false;
     AR_STATE.trackingState = 'idle';
@@ -295,9 +372,29 @@
     injectARStyles();
     document.body.classList.add('in-ar-session');
 
+    // Programmatically hide standard app views to guarantee zero split-screen or overlay leakage
+    const appEl = document.getElementById('app');
+    if (appEl) {
+      appEl.style.display = 'none';
+      appEl.style.visibility = 'hidden';
+    }
+    const navEl = document.getElementById('main-nav');
+    if (navEl) {
+      navEl.style.display = 'none';
+      navEl.style.visibility = 'hidden';
+    }
+    const cwrapEl = document.getElementById('cwrap');
+    if (cwrapEl) {
+      cwrapEl.style.display = 'none';
+    }
+    const mDrawer = document.getElementById('mobile-nav-drawer');
+    if (mDrawer) mDrawer.style.display = 'none';
+    const mBackdrop = document.getElementById('mobile-nav-backdrop');
+    if (mBackdrop) mBackdrop.style.display = 'none';
+
     const container = document.createElement('div');
     container.id = 'skillsafe-ar-scene-container';
-    container.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:91002;background:transparent;overflow:hidden;pointer-events:none';
+    container.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:20;background:transparent;overflow:hidden;pointer-events:none';
 
     container.innerHTML = `
       <a-scene embedded
@@ -390,33 +487,61 @@
 
     document.body.appendChild(container);
 
-    // Camera Video Watchdog: ensure AR.js webcam feed is attached, unmuted, and visible
+    // Camera Video Watchdog: enforce full-bleed 100vw x 100vh camera feed, overriding AR.js margin offsets on mobile portrait
     let watchdogCount = 0;
-    const vTimer = setInterval(() => {
+    if (window._arWatchdogTimer) clearInterval(window._arWatchdogTimer);
+    window._arWatchdogTimer = setInterval(() => {
       watchdogCount++;
-      const v = document.querySelector('video#arjs-video, .arjs-video');
+      const v = document.querySelector('video#arjs-video, .arjs-video, video');
       if (v) {
         v.setAttribute('autoplay', '');
         v.setAttribute('playsinline', '');
         v.setAttribute('muted', '');
-        v.style.position = 'fixed';
-        v.style.top = '0px';
-        v.style.left = '0px';
-        v.style.width = '100vw';
-        v.style.height = '100vh';
-        v.style.objectFit = 'cover';
-        v.style.zIndex = '91000';
-        v.style.display = 'block';
-        v.style.pointerEvents = 'none';
+        v.style.setProperty('position', 'fixed', 'important');
+        v.style.setProperty('top', '0px', 'important');
+        v.style.setProperty('left', '0px', 'important');
+        v.style.setProperty('right', '0px', 'important');
+        v.style.setProperty('bottom', '0px', 'important');
+        v.style.setProperty('width', '100vw', 'important');
+        v.style.setProperty('height', '100vh', 'important');
+        v.style.setProperty('min-width', '100vw', 'important');
+        v.style.setProperty('min-height', '100vh', 'important');
+        v.style.setProperty('margin', '0px', 'important');
+        v.style.setProperty('margin-left', '0px', 'important');
+        v.style.setProperty('margin-top', '0px', 'important');
+        v.style.setProperty('padding', '0px', 'important');
+        v.style.setProperty('object-fit', 'cover', 'important');
+        v.style.setProperty('z-index', '10', 'important');
+        v.style.setProperty('display', 'block', 'important');
+        v.style.setProperty('pointer-events', 'none', 'important');
         if (v.paused) {
           v.play().catch(e => console.warn("[SkillSafe AR] Auto-play retry:", e));
         }
-        clearInterval(vTimer);
-        console.log("[SkillSafe AR] Webcam feed verified and visible.");
-      } else if (watchdogCount > 30) {
-        clearInterval(vTimer);
       }
-    }, 200);
+
+      // Also enforce full bleed on A-Frame canvas
+      const c = document.querySelector('#skillsafe-ar-scene-container canvas.a-canvas');
+      if (c) {
+        c.style.setProperty('margin', '0px', 'important');
+        c.style.setProperty('margin-left', '0px', 'important');
+        c.style.setProperty('margin-top', '0px', 'important');
+        c.style.setProperty('top', '0px', 'important');
+        c.style.setProperty('left', '0px', 'important');
+        c.style.setProperty('width', '100vw', 'important');
+        c.style.setProperty('height', '100vh', 'important');
+      }
+
+      // Also ensure #app remains completely hidden while AR session is active
+      const curApp = document.getElementById('app');
+      if (curApp && curApp.style.display !== 'none') {
+        curApp.style.display = 'none';
+        curApp.style.visibility = 'hidden';
+      }
+
+      if (watchdogCount > 40 && !AR_STATE.active) {
+        clearInterval(window._arWatchdogTimer);
+      }
+    }, 150);
 
     mountARHUD();
     wireMarkerTrackingEvents();

@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const cors = require('cors');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { WebSocketServer, WebSocket } = require('ws');
 const { Pool } = require('pg');
@@ -16,9 +17,23 @@ const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres
 const SECRET_KEY = process.env.SECRET_KEY || 'skillsafe_vr_super_secret_enterprise_key_2026';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
+// Initialize PostgreSQL Pool (Connecting to Neon PostgreSQL)
+const isCloudDb = DATABASE_URL.includes('neon.tech') || DATABASE_URL.includes('sslmode=require') || DATABASE_URL.includes('render.com') || DATABASE_URL.includes('aws.neon');
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  connectionTimeoutMillis: 5000,
+  ...(isCloudDb ? { ssl: { rejectUnauthorized: false } } : {})
+});
+
+pool.on('error', (err) => {
+  console.warn('[PostgreSQL Pool Warning]:', err.message);
+});
+
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+
 
 // ====================================================================
 // AUTHENTICATION MIDDLEWARE
@@ -67,9 +82,30 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'login.html'));
 });
 
-// Health and status endpoints
-app.get('/health', (req, res) => {
-  res.json({ status: 'HEALTHY', timestamp: new Date().toISOString() });
+// ====================================================================
+// CORE BACKEND API ENDPOINTS (Neon PostgreSQL Native Handlers)
+// ====================================================================
+
+// Health check endpoint (verifies database connectivity)
+app.get(['/health', '/api/health'], async (req, res) => {
+  try {
+    const dbRes = await pool.query('SELECT current_database(), count(*)::int as users_count FROM users');
+    res.json({
+      status: 'HEALTHY',
+      database: 'CONNECTED',
+      database_name: dbRes.rows[0]?.current_database || 'neondb',
+      registered_users: dbRes.rows[0]?.users_count || 0,
+      gateway: 'Node.js Express + Neon PostgreSQL',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(200).json({
+      status: 'DEGRADED',
+      database_error: err.message,
+      gateway: 'Node.js Express',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // AI inference key endpoint from environment
@@ -77,11 +113,212 @@ app.get('/api/ai/key', (req, res) => {
   res.json({ key: process.env.GROQ_API_KEY || '' });
 });
 
+// Authentication: Login endpoint (Email & Password)
+app.post(['/api/v1/auth/login', '/api/v1/auth/dev-login'], async (req, res) => {
+  const { email, password, role } = req.body || {};
+  const cleanEmail = (email || '').trim().toLowerCase();
+
+  if (!cleanEmail) {
+    return res.status(400).json({ detail: 'Email address is required.' });
+  }
+
+  try {
+    const userRes = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+    if (userRes.rows.length === 0) {
+      return res.status(401).json({ detail: `Account '${cleanEmail}' not found. Please register or check your email.` });
+    }
+
+    const user = userRes.rows[0];
+
+    // Password validation (SHA-256)
+    if (user.password_hash) {
+      const hashedInput = crypto.createHash('sha256').update((password || '').trim()).digest('hex');
+      if (user.password_hash !== hashedInput) {
+        return res.status(401).json({ detail: 'Incorrect password. Please verify and try again.' });
+      }
+    }
+
+    // Role boundary validation
+    if (role) {
+      const reqRole = role.trim().toLowerCase();
+      if (user.role !== reqRole && user.role !== 'admin') {
+        return res.status(403).json({
+          detail: `Access Denied: Account '${cleanEmail}' is registered as ${user.role.toUpperCase()}. You cannot log in through the ${reqRole.toUpperCase()} portal.`
+        });
+      }
+    }
+
+    // Issue JWT token (7-day validity)
+    const token = jwt.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name
+      },
+      SECRET_KEY,
+      { expiresIn: '7d' }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        batch: user.batch,
+        trainee_id: user.trainee_id,
+        institution_id: user.institution_id,
+        avatar_url: user.avatar_url || ''
+      }
+    });
+  } catch (err) {
+    console.error('Login database error:', err);
+    return res.status(500).json({ detail: 'Internal database authentication error: ' + err.message });
+  }
+});
+
+// Authentication: Register endpoint
+app.post('/api/v1/auth/register', async (req, res) => {
+  const { name, email, password, role, batch, trainee_id } = req.body || {};
+  const cleanEmail = (email || '').trim().toLowerCase();
+
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return res.status(400).json({ detail: 'A valid email address is required.' });
+  }
+  if (!name || !name.trim()) {
+    return res.status(400).json({ detail: 'Full name is required.' });
+  }
+  if (!password || password.trim().length < 4) {
+    return res.status(400).json({ detail: 'Password must be at least 4 characters long.' });
+  }
+
+  const userRole = (role || 'learner').trim().toLowerCase();
+  const userBatch = batch || 'Industrial Electrical & Switchgear Isolation';
+  const tid = trainee_id || `REC-VR-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+  const userId = `u_${crypto.randomBytes(4).toString('hex')}`;
+  const passwordHash = crypto.createHash('sha256').update(password.trim()).digest('hex');
+
+  try {
+    const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ detail: `An account with email '${cleanEmail}' already exists. Please sign in.` });
+    }
+
+    const insertRes = await pool.query(
+      `INSERT INTO users (id, name, email, role, batch, trainee_id, institution_id, password_hash, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+       RETURNING *`,
+      [userId, name.trim(), cleanEmail, userRole, userBatch, tid, 'inst_nsdc', passwordHash]
+    );
+
+    const user = insertRes.rows[0];
+    const token = jwt.sign(
+      { sub: user.id, email: user.email, role: user.role, name: user.name },
+      SECRET_KEY,
+      { expiresIn: '7d' }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        batch: user.batch,
+        trainee_id: user.trainee_id,
+        institution_id: user.institution_id,
+        avatar_url: ''
+      }
+    });
+  } catch (err) {
+    console.error('Registration database error:', err);
+    return res.status(500).json({ detail: 'Internal database registration error: ' + err.message });
+  }
+});
+
+// Authentication: Get current user profile
+app.get('/api/v1/auth/me', async (req, res) => {
+  const decoded = verifyToken(req);
+  if (!decoded) {
+    return res.status(401).json({ detail: 'Unauthenticated or invalid token' });
+  }
+
+  try {
+    const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.sub]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ detail: 'User not found' });
+    }
+    const user = userRes.rows[0];
+    return res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      batch: user.batch,
+      trainee_id: user.trainee_id,
+      institution_id: user.institution_id,
+      avatar_url: user.avatar_url || ''
+    });
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// Training Modules endpoint
+app.get('/api/v1/modules', async (req, res) => {
+  try {
+    const modsRes = await pool.query('SELECT * FROM training_modules WHERE is_approved = true ORDER BY id');
+    return res.json(modsRes.rows);
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// Assignments endpoint
+app.get('/api/v1/assignments', async (req, res) => {
+  try {
+    const asgnsRes = await pool.query('SELECT * FROM assignments ORDER BY id');
+    return res.json(asgnsRes.rows);
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// Skill Passports: Current user passports
+app.get('/api/v1/passports/my', async (req, res) => {
+  const decoded = verifyToken(req);
+  if (!decoded) {
+    return res.status(401).json({ detail: 'Unauthenticated' });
+  }
+  try {
+    const passRes = await pool.query('SELECT * FROM skill_passports WHERE trainee_id = $1 OR full_name = $2 ORDER BY id DESC', [decoded.sub, decoded.name]);
+    return res.json(passRes.rows);
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// Skill Passports: Verification by hash (API)
+app.get('/api/v1/passports/verify/:hash', async (req, res) => {
+  const hash = req.params.hash;
+  try {
+    const passRes = await pool.query('SELECT * FROM skill_passports WHERE verification_hash = $1', [hash]);
+    if (passRes.rows.length === 0) {
+      return res.status(404).json({ valid: false, detail: 'Passport hash not found in registry.' });
+    }
+    return res.json({ valid: true, passport: passRes.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
 // Serve static assets needed by login page (CSS, fonts, etc.)
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
-
-// API proxy — auth is handled by FastAPI itself, we just forward
+// Secondary Proxy for extended FastAPI endpoints
 app.use('/api', async (req, res) => {
   let targetUrl;
   if (req.url === '/health' || req.url === '/health/') {
@@ -92,21 +329,11 @@ app.use('/api', async (req, res) => {
   }
   
   try {
-    const forwardHeaders = {
-      'content-type': 'application/json'
-    };
-    if (req.headers['authorization']) {
-      forwardHeaders['authorization'] = req.headers['authorization'];
-    }
-    if (req.headers['accept']) {
-      forwardHeaders['accept'] = req.headers['accept'];
-    }
+    const forwardHeaders = { 'content-type': 'application/json' };
+    if (req.headers['authorization']) forwardHeaders['authorization'] = req.headers['authorization'];
+    if (req.headers['accept']) forwardHeaders['accept'] = req.headers['accept'];
 
-    const fetchOptions = {
-      method: req.method,
-      headers: forwardHeaders
-    };
-
+    const fetchOptions = { method: req.method, headers: forwardHeaders };
     if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
       fetchOptions.body = JSON.stringify(req.body || {});
     }
@@ -131,6 +358,7 @@ app.use('/api', async (req, res) => {
     });
   }
 });
+
 
 // ====================================================================
 // PUBLIC SKILL PASSPORT VERIFICATION (Real QR Code Endpoint)
@@ -293,18 +521,9 @@ app.use((req, res, next) => {
 });
 
 // ====================================================================
-// PostgreSQL Pool (Graceful connection handling & Neon SSL support)
+// PostgreSQL Pool Health Check
 // ====================================================================
-const isCloudDb = DATABASE_URL.includes('neon.tech') || DATABASE_URL.includes('sslmode=require') || DATABASE_URL.includes('render.com') || DATABASE_URL.includes('aws.neon');
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-  connectionTimeoutMillis: 5000,
-  ...(isCloudDb ? { ssl: { rejectUnauthorized: false } } : {})
-});
 
-pool.on('error', (err) => {
-  console.warn('[PostgreSQL Pool Warning]:', err.message);
-});
 
 async function checkPostgres() {
   try {

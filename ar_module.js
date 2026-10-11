@@ -35,10 +35,74 @@
   const ARJS_CDN = "https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js";
 
   // -----------------------------------------------------------------------
-  // Helper: Dynamically Load A-Frame & AR.js on demand
+  // Core Styles: Guarantees video feed is visible behind transparent A-Frame canvas
+  // -----------------------------------------------------------------------
+  function injectARStyles() {
+    let style = document.getElementById('skillsafe-ar-core-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'skillsafe-ar-core-style';
+      document.head.appendChild(style);
+    }
+    style.textContent = `
+      /* Video feed from AR.js webcam */
+      video#arjs-video, .arjs-video {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        object-fit: cover !important;
+        z-index: 91000 !important;
+        pointer-events: none !important;
+        display: block !important;
+        background: #000 !important;
+      }
+      /* Transparent A-Frame scene container overlay */
+      #skillsafe-ar-scene-container {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 91002 !important;
+        background: transparent !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+      }
+      #skillsafe-ar-scene-container a-scene {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: transparent !important;
+      }
+      #skillsafe-ar-scene-container canvas.a-canvas {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: transparent !important;
+        pointer-events: auto !important;
+      }
+      /* Top & Bottom HUD Layer */
+      #skillsafe-ar-hud-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 91005 !important;
+        pointer-events: none !important;
+      }
+      /* Prevent parent scrolling during AR */
+      body.in-ar-session {
+        overflow: hidden !important;
+      }
+    `;
+  }
+
+  // -----------------------------------------------------------------------
+  // Helper: Verify / Load A-Frame & AR.js Libraries
   // -----------------------------------------------------------------------
   function loadARLibraries(callback) {
-    if (window.AFRAME && window.THREEx && window.THREEx.ArToolkitContext) {
+    if (window.AFRAME && (window.ARjs || (window.THREEx && window.THREEx.ArToolkitContext))) {
       AR_STATE.aframeLoaded = true;
       AR_STATE.arjsLoaded = true;
       return callback(null);
@@ -80,7 +144,7 @@
   window.exitARSession = function() {
     console.log("[SkillSafe AR] Terminating AR Session & cleaning up hardware...");
 
-    // 1. Stop all video streams
+    // 1. Stop all video streams from all sources
     if (AR_STATE.stream) {
       try {
         AR_STATE.stream.getTracks().forEach(t => {
@@ -91,7 +155,6 @@
       AR_STATE.stream = null;
     }
 
-    // Also stop any rogue media streams in window
     if (window._ms) {
       try {
         window._ms.getTracks().forEach(t => t.stop());
@@ -99,8 +162,8 @@
       window._ms = null;
     }
 
-    // 2. Remove all AR.js video and camera elements from DOM
-    const videos = document.querySelectorAll('video#arjs-video, video');
+    // 2. Remove all AR.js video elements
+    const videos = document.querySelectorAll('video#arjs-video, .arjs-video, video');
     videos.forEach(v => {
       try {
         if (v.srcObject) {
@@ -122,17 +185,19 @@
       sceneContainer.remove();
     }
 
-    // 4. Remove HUD Overlay
+    // 4. Remove HUD Overlay & Styles
     const hud = document.getElementById('skillsafe-ar-hud-overlay');
     if (hud) hud.remove();
 
-    // 5. Restore document body overflow and styles
+    const st = document.getElementById('skillsafe-ar-core-style');
+    if (st) st.remove();
+
+    // 5. Restore body & document styles
+    document.body.classList.remove('in-ar-session');
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
     const htmlEl = document.querySelector('html');
-    if (htmlEl) {
-      htmlEl.classList.remove('a-fullscreen');
-    }
+    if (htmlEl) htmlEl.classList.remove('a-fullscreen');
 
     AR_STATE.active = false;
     AR_STATE.trackingState = 'idle';
@@ -150,7 +215,7 @@
     const launchBtn = document.getElementById('btn-start-ar-training');
     if (launchBtn) {
       launchBtn.disabled = true;
-      launchBtn.innerHTML = `⏳ Initializing Camera &amp; AR Engine...`;
+      launchBtn.innerHTML = `⏳ Starting Camera...`;
     }
 
     // Check getUserMedia support
@@ -163,67 +228,23 @@
       return;
     }
 
-    // Step 1: Pre-flight Camera Permission Check (with rear-camera fallback & timeout)
-    let settled = false;
-    const timeoutId = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        if (launchBtn) {
-          launchBtn.disabled = false;
-          launchBtn.innerHTML = `🚀 Start AR Training`;
-        }
-        showCameraErrorModal({ name: 'PermissionPromptTimeout', message: 'Camera access timed out or awaiting browser permission prompt.' });
-      }
-    }, 12000);
-
-    function requestStream() {
-      return navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      }).catch(err => {
-        console.warn("[SkillSafe AR] Ideal environment constraint rejected, falling back to standard video:", err);
-        return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      });
-    }
-
-    requestStream().then(testStream => {
-      clearTimeout(timeoutId);
-      if (settled) return;
-      settled = true;
-
-      // Release test stream tracks so AR.js has exclusive camera device lock
-      try {
-        testStream.getTracks().forEach(t => t.stop());
-      } catch(e) {}
-
-      // Step 2: Load A-Frame & AR.js
+    // Ensure libraries are available, then mount scene directly inside user gesture
+    if (window.AFRAME && (window.ARjs || window.THREEx)) {
+      mountARScene();
+    } else {
       loadARLibraries((err) => {
         if (err) {
           console.error("[SkillSafe AR] Library load error:", err);
-          alert("Error loading AR tracking libraries: " + err.message + "\nPlease verify your internet connection and try again.");
-          exitARSession();
+          showCameraErrorModal(err);
+          if (launchBtn) {
+            launchBtn.disabled = false;
+            launchBtn.innerHTML = `🚀 Start AR Training`;
+          }
           return;
         }
-
-        // Step 3: Mount AR Scene & Overlays
         mountARScene();
       });
-    }).catch(err => {
-      clearTimeout(timeoutId);
-      if (settled) return;
-      settled = true;
-
-      console.error("[SkillSafe AR] Camera access denied or failed:", err);
-      if (launchBtn) {
-        launchBtn.disabled = false;
-        launchBtn.innerHTML = `🚀 Start AR Training`;
-      }
-      showCameraErrorModal(err);
-    });
+    }
   };
 
   // -----------------------------------------------------------------------
@@ -247,8 +268,8 @@
         </div>
         <p style="font-size:14px;color:#cbd5e1;line-height:1.6;margin:0 0 16px">
           ${isDenied
-            ? 'SkillSafe VR requires rear camera access to track the physical HIRO marker and project the 3D electrical panel. Please allow camera permissions in your browser address bar (lock icon) and tap Try Again.'
-            : 'Could not access the device camera. Ensure your device has an active camera, is not being used by another application, and that you are accessing via HTTPS.'}
+            ? 'SkillSafe VR requires camera access to track the physical HIRO marker and project the 3D electrical panel. Please allow camera permissions in your browser address bar (lock icon) and tap Try Again.'
+            : 'Could not access the device camera (' + (err.message || 'unknown error') + '). Ensure your camera is not used by another app and you are on HTTPS.'}
         </p>
         <div style="background:#1e293b;padding:12px;border-radius:10px;font-size:12.5px;color:#94a3b8;margin-bottom:20px">
           💡 <b>Troubleshooting:</b><br>
@@ -267,20 +288,23 @@
   // -----------------------------------------------------------------------
   // Mount A-Frame & AR.js Scene with Procedural 3D Electrical Panel
   // -----------------------------------------------------------------------
-  function mountARScene(stream) {
+  function mountARScene() {
     AR_STATE.active = true;
     AR_STATE.trackingState = 'searching';
 
+    injectARStyles();
+    document.body.classList.add('in-ar-session');
+
     const container = document.createElement('div');
     container.id = 'skillsafe-ar-scene-container';
-    container.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:90000;background:#000;overflow:hidden';
+    container.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:91002;background:transparent;overflow:hidden;pointer-events:none';
 
     container.innerHTML = `
       <a-scene embedded
                arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best;"
                vr-mode-ui="enabled: false"
-               renderer="logarithmicDepthBuffer: true; antialias: true; colorManagement: true;"
-               style="width: 100%; height: 100%;">
+               renderer="alpha: true; antialias: true;"
+               style="width: 100vw; height: 100vh; background: transparent;">
 
         <!-- 3D Lighting for Industrial Switchgear Material Visibility -->
         <a-entity light="type: ambient; color: #ffffff; intensity: 1.2;"></a-entity>
@@ -365,6 +389,34 @@
     `;
 
     document.body.appendChild(container);
+
+    // Camera Video Watchdog: ensure AR.js webcam feed is attached, unmuted, and visible
+    let watchdogCount = 0;
+    const vTimer = setInterval(() => {
+      watchdogCount++;
+      const v = document.querySelector('video#arjs-video, .arjs-video');
+      if (v) {
+        v.setAttribute('autoplay', '');
+        v.setAttribute('playsinline', '');
+        v.setAttribute('muted', '');
+        v.style.position = 'fixed';
+        v.style.top = '0px';
+        v.style.left = '0px';
+        v.style.width = '100vw';
+        v.style.height = '100vh';
+        v.style.objectFit = 'cover';
+        v.style.zIndex = '91000';
+        v.style.display = 'block';
+        v.style.pointerEvents = 'none';
+        if (v.paused) {
+          v.play().catch(e => console.warn("[SkillSafe AR] Auto-play retry:", e));
+        }
+        clearInterval(vTimer);
+        console.log("[SkillSafe AR] Webcam feed verified and visible.");
+      } else if (watchdogCount > 30) {
+        clearInterval(vTimer);
+      }
+    }, 200);
 
     mountARHUD();
     wireMarkerTrackingEvents();
@@ -482,27 +534,27 @@
 
     const modal = document.createElement('div');
     modal.id = 'ar-digital-marker-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,12,0.95);backdrop-filter:blur(10px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999999;padding:20px;box-sizing:border-box';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,12,0.95);backdrop-filter:blur(10px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999999;padding:16px;box-sizing:border-box';
 
     modal.innerHTML = `
-      <div style="background:#fff;border-radius:18px;padding:24px;display:flex;flex-direction:column;align-items:center;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.8);text-align:center">
-        <div style="display:flex;justify-content:space-between;width:100%;align-items:center;margin-bottom:12px">
+      <div style="background:#fff;border-radius:18px;padding:20px;display:flex;flex-direction:column;align-items:center;max-width:440px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.8);text-align:center">
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:center;margin-bottom:8px">
           <div style="font-size:12px;font-weight:800;color:#0f172a;letter-spacing:1px;text-transform:uppercase">HIRO TRACKING TARGET</div>
           <button onclick="document.getElementById('ar-digital-marker-modal').remove()" style="background:#f1f5f9;border:none;font-size:20px;line-height:1;border-radius:50%;width:32px;height:32px;cursor:pointer;color:#475569">&times;</button>
         </div>
 
-        <div style="background:#fff;padding:12px;border:2px solid #e2e8f0;border-radius:12px;display:inline-block;margin-bottom:16px">
-          <img src="/hiro_marker.png" alt="HIRO AR Tracking Marker" style="width:280px;height:280px;display:block;image-rendering:pixelated">
+        <div style="background:#fff;padding:16px;border:3px solid #0f172a;border-radius:12px;display:inline-block;margin:6px auto 12px">
+          <img src="/hiro_marker.png" alt="HIRO AR Tracking Marker" style="width:min(240px, 36vh);height:min(240px, 36vh);display:block;image-rendering:pixelated">
         </div>
 
-        <p style="font-size:13px;color:#334155;line-height:1.5;margin:0 0 16px">
+        <p style="font-size:12.5px;color:#334155;line-height:1.45;margin:0 0 14px">
           📱 <b>Point your mobile camera directly at this target.</b><br>
-          Keep screen brightness high (&gt;80%) and hold the phone steady 30–50 cm away.
+          Keep screen brightness high (&gt;80%) and hold phone 30–50 cm away.
         </p>
 
         <div style="display:flex;gap:8px;width:100%">
-          <button class="b o" onclick="window.printHIROSheet()" style="flex:1;color:#0284c7;border-color:#0284c7;font-size:12.5px;padding:9px">🖨️ Print A4 Sheet</button>
-          <button class="b" onclick="document.getElementById('ar-digital-marker-modal').remove()" style="flex:1;font-size:12.5px;padding:9px">Got It ➔</button>
+          <button class="b" onclick="document.getElementById('ar-digital-marker-modal').remove();window.toggleHiroFullscreen()" style="flex:1;background:#0284c7;font-size:12px;padding:8px">⛶ Fullscreen</button>
+          <button class="b o" onclick="window.printHIROSheet()" style="flex:1;color:#0284c7;border-color:#0284c7;font-size:12px;padding:8px">🖨️ Print Sheet</button>
         </div>
       </div>
     `;
@@ -659,33 +711,91 @@
   };
 
   // -----------------------------------------------------------------------
+  // Helper: Fullscreen Pure-White Target Overlay
+  // -----------------------------------------------------------------------
+  window.toggleHiroFullscreen = function() {
+    let fsOverlay = document.getElementById('hiro-fullscreen-overlay');
+    if (fsOverlay) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(()=>{});
+      }
+      fsOverlay.remove();
+      return;
+    }
+
+    fsOverlay = document.createElement('div');
+    fsOverlay.id = 'hiro-fullscreen-overlay';
+    fsOverlay.style.cssText = 'position:fixed;inset:0;background:#ffffff;z-index:99999999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;box-sizing:border-box';
+    fsOverlay.innerHTML = `
+      <div style="position:absolute;top:16px;right:16px;display:flex;gap:12px;align-items:center">
+        <span style="font-size:12px;color:#64748b;font-weight:700">ESC to exit</span>
+        <button onclick="window.toggleHiroFullscreen()" style="background:#0f172a;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.3)">
+          ✕ Exit Fullscreen
+        </button>
+      </div>
+
+      <div style="padding:28px;background:#ffffff;border:5px solid #000000;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.12)">
+        <img src="/hiro_marker.png" alt="Official HIRO Marker" style="width:min(68vh, 68vw);height:min(68vh, 68vw);max-width:550px;max-height:550px;display:block;image-rendering:pixelated">
+        <div style="text-align:center;font-size:13px;font-weight:800;color:#0f172a;margin-top:12px;letter-spacing:1px">▲ TOP ▲</div>
+      </div>
+
+      <div style="margin-top:16px;font-size:13px;color:#475569;font-weight:600">
+        📱 Aim your phone camera directly at this target (30–50 cm distance)
+      </div>
+    `;
+
+    document.body.appendChild(fsOverlay);
+
+    if (fsOverlay.requestFullscreen) {
+      fsOverlay.requestFullscreen().catch(()=>{});
+    }
+
+    const escListener = (e) => {
+      if (e.key === 'Escape') {
+        window.toggleHiroFullscreen();
+        document.removeEventListener('keydown', escListener);
+      }
+    };
+    document.addEventListener('keydown', escListener);
+  };
+
+  // -----------------------------------------------------------------------
   // VIEW: 💻 Full-Screen Digital Target for Laptop/Tablet (`V['ar-screen']`)
   // -----------------------------------------------------------------------
   V['ar-screen'] = function() {
     return `
-      <div class="w" style="max-width:720px;margin:0 auto;padding:24px 16px;text-align:center">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <button class="b o" onclick="go('ar')" style="font-size:13px;padding:6px 14px">
+      <div class="w" style="max-width:760px;margin:0 auto;padding:12px 16px;text-align:center">
+        <!-- Compact Header Controls -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <button class="b o" onclick="go('ar')" style="font-size:12.5px;padding:6px 14px">
             ⬅ Return to AR Module
           </button>
-          <span class="tag ok" style="font-size:11px">SCREEN TARGET MODE</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="b" onclick="window.toggleHiroFullscreen()" style="font-size:12.5px;padding:6px 14px;background:#0284c7">
+              ⛶ Fullscreen Target
+            </button>
+            <button class="b bw" onclick="go('ar-print')" style="font-size:12.5px;padding:6px 14px">
+              🖨️ Print Sheet
+            </button>
+          </div>
         </div>
 
-        <div class="c" style="background:#ffffff;color:#000000;padding:32px 20px;border-radius:16px;box-shadow:0 15px 50px rgba(0,0,0,0.5)">
-          <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px">Full-Screen Digital HIRO Target</h2>
-          <p style="margin:0 0 20px;color:#64748b;font-size:13px">
-            Keep this screen open on your laptop or tablet, then point your mobile phone camera at it!
-          </p>
-
-          <div style="display:inline-block;padding:12px;background:#fff;border:2px solid #cbd5e1;border-radius:12px">
-            <img src="/hiro_marker.png" alt="HIRO Target" style="width:300px;height:300px;display:block;image-rendering:pixelated">
+        <!-- Fully Visible Target Card (Fits completely in standard laptop viewport) -->
+        <div id="hiro-digital-card" style="background:#ffffff;color:#000000;padding:20px;border-radius:16px;box-shadow:0 15px 50px rgba(0,0,0,0.6);display:flex;flex-direction:column;align-items:center">
+          <div style="margin-bottom:8px">
+            <h3 style="margin:0;color:#0f172a;font-size:18px;font-weight:800;letter-spacing:0.5px">HIRO AR TRACKING TARGET</h3>
+            <span style="font-size:12px;color:#64748b">Keep this open on your laptop/tablet and point your phone camera at it</span>
           </div>
 
-          <div style="max-width:440px;margin:20px auto 0;font-size:12.5px;color:#475569;line-height:1.5;text-align:left;background:#f8fafc;padding:12px 16px;border-radius:8px">
-            💡 <b>Tips for Screen Tracking:</b><br>
-            • Increase screen brightness to <b>80% or higher</b>.<br>
-            • Avoid screen glare or reflections directly over the black border.<br>
-            • Hold your phone at an angle of <b>45° to 90°</b> relative to the screen.
+          <!-- The Marker: Scaled responsively with generous quiet zone so it never clips -->
+          <div style="display:inline-block;padding:20px;background:#ffffff;border:4px solid #0f172a;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,0.12);margin:4px auto 12px">
+            <img id="hiro-display-img" src="/hiro_marker.png" alt="Official HIRO Marker" style="width:min(44vh, 65vw, 300px);height:min(44vh, 65vw, 300px);display:block;image-rendering:pixelated">
+            <div style="font-size:11px;font-weight:700;color:#64748b;margin-top:6px">▲ TOP (ALIGN PANEL UPWARDS) ▲</div>
+          </div>
+
+          <!-- Quick Tip Bar -->
+          <div style="max-width:440px;width:100%;font-size:12px;color:#475569;line-height:1.45;text-align:left;background:#f8fafc;border:1px solid #e2e8f0;padding:10px 14px;border-radius:8px">
+            💡 <b>Tracking Tips:</b> Screen brightness <b>&gt;80%</b>. Hold phone steady <b>30–50 cm away</b> at a 45°–90° angle. Click <b>Fullscreen Target</b> for a glare-free full-screen display.
           </div>
         </div>
       </div>

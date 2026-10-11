@@ -3557,10 +3557,13 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
             <p class="m" style="margin:0;font-size:12px">Upload real workplace photos. Vision AI audits OSHA violations and builds a playable 3D simulation.</p>
           </div>
 
-          <div class="c cl" onclick="go('ar')">
-            <span style="font-size:32px">📱</span>
-            <h4 style="margin:8px 0 4px">AR Mode &amp; Live PPE Scan</h4>
-            <p class="m" style="margin:0;font-size:12px">Camera guidance markers, spatial step arrows, and live phone camera AI PPE verification.</p>
+          <div class="c cl" onclick="go('ar')" style="border:1.5px solid #38bdf8;box-shadow:0 4px 20px rgba(56,189,248,0.12)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <span style="font-size:32px">⚡</span>
+              <span class="tag a" style="font-size:10px">3–5 MINS · WEBAR</span>
+            </div>
+            <h4 style="margin:8px 0 4px;color:#f8fafc">AR Electrical Panel Safety</h4>
+            <p class="m" style="margin:0;font-size:12px;color:#94a3b8">Real HIRO marker-tracked 415V switchgear inspection with spatial components and hazard challenge.</p>
           </div>
         </div>
 

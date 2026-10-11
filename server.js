@@ -644,7 +644,7 @@ app.get(['/learner', '/trainee', '/dashboard'], (req, res) => {
 });
 
 // Explicit static file serving for client assets
-app.get(['/platform_extension.js', '/views_extension.js', '/qrcode.bundle.js'], (req, res) => {
+app.get(['/platform_extension.js', '/views_extension.js', '/qrcode.bundle.js', '/ar_module.js'], (req, res) => {
   const fileName = path.basename(req.path.split('?')[0]);
   const filePath = path.join(__dirname, fileName);
   if (fs.existsSync(filePath)) {
@@ -653,6 +653,17 @@ app.get(['/platform_extension.js', '/views_extension.js', '/qrcode.bundle.js'], 
     return res.sendFile(filePath);
   }
   res.status(404).send(`File ${fileName} not found`);
+});
+
+// Explicit serving for HIRO tracking marker image
+app.get('/hiro_marker.png', (req, res) => {
+  const filePath = path.join(__dirname, 'hiro_marker.png');
+  if (fs.existsSync(filePath)) {
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(filePath);
+  }
+  res.status(404).send('HIRO marker image not found');
 });
 
 // Serve static files for authenticated app (JS, CSS, images, models, etc.)

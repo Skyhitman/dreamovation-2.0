@@ -954,7 +954,12 @@
     }
 
     // ---- Google Sign-In Callback ----
+    window.handleGoogleCredential = handleGoogleCredential;
     function handleGoogleCredential(response) {
+      if (!response || !response.credential) {
+        showStatus('error', 'No Google credential received.');
+        return;
+      }
       showStatus('loading', 'Verifying Google authentication with institutional registry...');
       
       fetch(`${API_BASE}/auth/google`, {
@@ -971,9 +976,43 @@
         }
       })
       .catch(err => {
-        showStatus('error', 'Network error connecting to Google sign-in service.');
+        showStatus('error', 'Network error connecting to Google sign-in service: ' + err.message);
       });
     }
+
+    // Programmatic Google Button Init
+    function initGoogleAuth() {
+      const clientId = '330255293981-t79ggd6cdelkgp5ksf43vtrdbi65lpfn.apps.googleusercontent.com';
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredential,
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+          const btnEl = document.querySelector('.g_id_signin');
+          if (btnEl) {
+            window.google.accounts.id.renderButton(btnEl, {
+              type: 'standard',
+              theme: 'outline',
+              size: 'large',
+              text: 'signin_with',
+              shape: 'rectangular',
+              logo_alignment: 'left',
+              width: 380
+            });
+          }
+        } catch (e) {
+          console.warn('Google Auth Init Warning:', e);
+        }
+      }
+    }
+
+    window.addEventListener('load', () => {
+      setTimeout(initGoogleAuth, 400);
+    });
+
 
     // ---- Login Success Handler ----
     function loginSuccess(data) {

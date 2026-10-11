@@ -239,8 +239,132 @@ app.post('/api/v1/auth/register', async (req, res) => {
   }
 });
 
+// Authentication: Google OAuth2 endpoint
+app.post('/api/v1/auth/google', async (req, res) => {
+  const { credential, requested_role } = req.body || {};
+  if (!credential) {
+    return res.status(400).json({ detail: 'Google credential token is required.' });
+  }
+
+  try {
+    // Verify token with Google's tokeninfo API
+    const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+    if (!googleRes.ok) {
+      const errText = await googleRes.text();
+      return res.status(401).json({ detail: 'Invalid Google token signature or expired: ' + errText });
+    }
+
+    const idinfo = await googleRes.json();
+    const userEmail = (idinfo.email || '').trim().toLowerCase();
+    const userSub = idinfo.sub;
+    const userName = idinfo.name || userEmail.split('@')[0];
+    const userPic = idinfo.picture || '';
+
+    if (!userEmail) {
+      return res.status(400).json({ detail: 'No email address associated with this Google account.' });
+    }
+
+    // Query existing user by google_sub or email
+    const existing = await pool.query(
+      'SELECT * FROM users WHERE google_sub = $1 OR LOWER(email) = LOWER($2)',
+      [userSub, userEmail]
+    );
+
+    let user;
+    const reqRole = (requested_role || 'learner').trim().toLowerCase();
+
+    if (existing.rows.length === 0) {
+      // Role gate for new users
+      if (reqRole === 'trainer') {
+        if (userEmail === 'saurav.k.2024.ece@rajalakshmi.edu.in') {
+          const insertRes = await pool.query(
+            `INSERT INTO users (id, name, email, role, batch, trainee_id, institution_id, google_sub, avatar_url, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) RETURNING *`,
+            ['u_trainer_saurav', userName, userEmail, 'trainer', 'Electrical & Electronics Engineering', 'REC-TR-2024', 'inst_nsdc', userSub, userPic]
+          );
+          user = insertRes.rows[0];
+        } else {
+          return res.status(403).json({
+            detail: `Access Denied: '${userEmail}' is not authorized as Trainer. Designated trainer is saurav.k.2024.ece@rajalakshmi.edu.in.`
+          });
+        }
+      } else if (reqRole === 'admin') {
+        if (userEmail === 'samisauravanu@gmail.com') {
+          const insertRes = await pool.query(
+            `INSERT INTO users (id, name, email, role, batch, trainee_id, institution_id, google_sub, avatar_url, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) RETURNING *`,
+            ['u_admin_sami', userName, userEmail, 'admin', 'Institutional Governance', 'ADM-GLOBAL-01', 'inst_nsdc', userSub, userPic]
+          );
+          user = insertRes.rows[0];
+        } else {
+          return res.status(403).json({
+            detail: `Access Denied: '${userEmail}' is not authorized as Admin. Designated admin is samisauravanu@gmail.com.`
+          });
+        }
+      } else {
+        // Auto-enroll new learner
+        const newId = `u_${crypto.randomBytes(4).toString('hex')}`;
+        const newTid = `REC-VR-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+        const insertRes = await pool.query(
+          `INSERT INTO users (id, name, email, role, batch, trainee_id, institution_id, google_sub, avatar_url, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) RETURNING *`,
+          [newId, userName, userEmail, 'learner', 'Vocational Engineering Batch 2024-25', newTid, 'inst_nsdc', userSub, userPic]
+        );
+        user = insertRes.rows[0];
+      }
+    } else {
+      user = existing.rows[0];
+      // Update sub / avatar if not present
+      if (!user.google_sub || (userPic && user.avatar_url !== userPic)) {
+        await pool.query(
+          'UPDATE users SET google_sub = $1, avatar_url = $2 WHERE id = $3',
+          [userSub, userPic || user.avatar_url, user.id]
+        );
+        user.avatar_url = userPic || user.avatar_url;
+      }
+    }
+
+    // Role boundary validation
+    if (user.role === 'learner' && reqRole !== 'learner') {
+      return res.status(403).json({
+        detail: `Access Denied: Account '${userEmail}' is registered as Learner. You cannot access the ${reqRole.toUpperCase()} portal.`
+      });
+    }
+    if (user.role === 'trainer' && reqRole !== 'trainer') {
+      return res.status(403).json({
+        detail: `Access Denied: Account '${userEmail}' is registered as Trainer. You cannot access the ${reqRole.toUpperCase()} portal.`
+      });
+    }
+
+    // Issue JWT token
+    const token = jwt.sign(
+      { sub: user.id, email: user.email, role: user.role, name: user.name },
+      SECRET_KEY,
+      { expiresIn: '7d' }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        batch: user.batch,
+        trainee_id: user.trainee_id,
+        institution_id: user.institution_id,
+        avatar_url: user.avatar_url || userPic || ''
+      }
+    });
+  } catch (err) {
+    console.error('Google login processing error:', err);
+    return res.status(500).json({ detail: 'Google authentication error: ' + err.message });
+  }
+});
+
 // Authentication: Get current user profile
 app.get('/api/v1/auth/me', async (req, res) => {
+
   const decoded = verifyToken(req);
   if (!decoded) {
     return res.status(401).json({ detail: 'Unauthenticated or invalid token' });

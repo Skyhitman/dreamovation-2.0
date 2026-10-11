@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: skillsafe-vr
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FASTAPI_URL
+        value: http://127.0.0.1:8000
+      - key: GOOGLE_CLIENT_ID
+        value: 330255293981-t79ggd6cdelkgp5ksf43vtrdbi65lpfn.apps.googleusercontent.com
+      - key: GROQ_API_KEY
+        sync: false
+

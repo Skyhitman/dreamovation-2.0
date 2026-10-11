@@ -9,3 +9,6 @@ skillsafe.db
 *.backup.html
 .vercel/
 
+
+.vercel
+.env*

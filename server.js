@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const cors = require('cors');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
@@ -642,6 +643,18 @@ app.get(['/learner', '/trainee', '/dashboard'], (req, res) => {
   res.redirect('/app?role=learner');
 });
 
+// Explicit static file serving for client assets
+app.get(['/platform_extension.js', '/views_extension.js', '/qrcode.bundle.js'], (req, res) => {
+  const fileName = path.basename(req.path.split('?')[0]);
+  const filePath = path.join(__dirname, fileName);
+  if (fs.existsSync(filePath)) {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    return res.sendFile(filePath);
+  }
+  res.status(404).send(`File ${fileName} not found`);
+});
+
 // Serve static files for authenticated app (JS, CSS, images, models, etc.)
 // These files are needed by index.html and platform_extension.js
 const staticExtensions = ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico',
@@ -649,10 +662,15 @@ const staticExtensions = ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg'
                            '.mtl', '.fbx', '.mp3', '.wav', '.mp4', '.webm', '.webp', '.json'];
 
 app.use((req, res, next) => {
-  const ext = path.extname(req.path).toLowerCase();
+  const cleanPath = req.path.split('?')[0];
+  const ext = path.extname(cleanPath).toLowerCase();
   if (staticExtensions.includes(ext)) {
-    // Serve static assets without auth check (they're referenced by the app)
-    return express.static(path.join(__dirname))(req, res, next);
+    const filePath = path.join(__dirname, cleanPath);
+    if (fs.existsSync(filePath)) {
+      if (ext === '.js') res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      else if (ext === '.css') res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      return res.sendFile(filePath);
+    }
   }
   next();
 });
@@ -777,10 +795,14 @@ app.get('/config/google-client-id', (req, res) => {
 });
 
 // ====================================================================
-// Catch-all: Redirect unauthenticated users to login
-// ====================================================================
+// Catch-all: Redirect unauthenticated page requests to login, 404 for missing assets
 app.get('*', (req, res) => {
-  // Root path and any unmatched route → redirect to login
+  const cleanPath = req.path.split('?')[0];
+  const ext = path.extname(cleanPath);
+  if (ext) {
+    return res.status(404).send('Asset not found');
+  }
+  // Root path and any unmatched page route → redirect to login
   res.redirect('/login');
 });
 

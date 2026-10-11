@@ -294,7 +294,28 @@
   // 2. ROLE-BASED ACCESS CONTROL (RBAC) & NAVIGATION SECURITY
   // -----------------------------------------------------------------------
 
-  const USER_AUTH_ROLE = AUTH_USER.role || 'learner';
+  let USER_AUTH_ROLE = AUTH_USER.role || 'learner';
+  window.USER_AUTH_ROLE = USER_AUTH_ROLE;
+
+  window.switchRole = function(role) {
+    USER_AUTH_ROLE = role;
+    window.USER_AUTH_ROLE = role;
+    AUTH_USER.role = role;
+    try {
+      localStorage.setItem('skillsafe_user', JSON.stringify(AUTH_USER));
+    } catch(e) {}
+    if (window.S) window.S.role = role;
+    updateNavHeader();
+    if (role === 'trainer') {
+      window.curTrainerTab = 'overview';
+      go('trainer');
+    } else if (role === 'admin') {
+      window.curAdminTab = 'institutions';
+      go('admin');
+    } else {
+      go('dash');
+    }
+  };
 
   // Modal: Access Denied / Authorization Required
   window.showAccessDeniedModal = function(requiredRole, currentRole) {
@@ -1061,6 +1082,17 @@
 
   // Initialize nav and route to dedicated role view on load
   setTimeout(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const reqRole = urlParams.get('role') || (window.location.hash ? window.location.hash.replace('#', '') : null);
+      if (reqRole && ['learner', 'trainer', 'admin'].includes(reqRole)) {
+        USER_AUTH_ROLE = reqRole;
+        window.USER_AUTH_ROLE = reqRole;
+        AUTH_USER.role = reqRole;
+        try { localStorage.setItem('skillsafe_user', JSON.stringify(AUTH_USER)); } catch(e) {}
+      }
+    } catch(e) {}
+
     updateNavHeader();
     if (USER_AUTH_ROLE === 'trainer') {
       go('trainer');

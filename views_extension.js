@@ -3597,45 +3597,133 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
   // -----------------------------------------------------------------------
   V.home = function() {
     return `
-      <section class="hero" style="padding:60px 16px;text-align:center">
-        <span class="tag" style="background:#0284c7;color:#fff;letter-spacing:1px">ENTERPRISE VOCATIONAL TRAINING PLATFORM</span>
-        <h1 style="margin:10px 0 4px">SkillSafe VR</h1>
-        <h2 style="color:var(--warn);margin:0 0 16px;font-size:clamp(18px,3vw,26px)">Learn. Practice. Fail Safely. Master Skills.</h2>
-        <p style="max-width:720px;margin:0 auto 24px;font-size:16px;color:#cbd5e1;line-height:1.6">
-          The comprehensive vocational training architecture combining <b>3D/VR Virtual Workplaces</b>, <b>AI Scenario Generation</b>, <b>Deterministic Safety Gates</b>, and <b>Official Verifiable Skill Passports</b>.
+      <section class="hero" style="padding:48px 16px 36px;text-align:center">
+        <span class="tag" style="background:linear-gradient(135deg,#0284c7,#38bdf8);color:#fff;font-weight:700;letter-spacing:1px;padding:4px 12px;border-radius:20px">AR/VR VOCATIONAL TRAINING PLATFORM</span>
+        <h1 style="font-size:clamp(32px,5vw,52px);margin:14px 0 6px;letter-spacing:-1px">SkillSafe <span style="color:#38bdf8">VR</span></h1>
+        <h2 style="color:var(--warn);font-size:clamp(18px,3vw,26px);margin:0 0 14px;font-weight:700">Learn. Practice. Fail Safely. Master Skills.</h2>
+        <p style="max-width:760px;margin:0 auto 24px;font-size:16px;color:#cbd5e1;line-height:1.6">
+          An immersive AR/VR vocational engineering platform allowing technical trainees to practice high-voltage electrical procedures, industrial welding, and machine maintenance with <b>deterministic OSHA/AWS safety gates</b>, <b>Three.js WebXR simulations</b>, and <b>tamper-evident Skill Passports</b>.
         </p>
 
         <!-- Primary CTA Buttons -->
-        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-          <button class="b" onclick="switchRole('learner')">🎓 Enter Learner Workspace</button>
-          <button class="b o" onclick="go('mods')">📚 Training Library</button>
-          <button class="b bw" onclick="go('cadlab')">🔬 Open CAD Lab</button>
-          <button class="b o" onclick="switchRole('trainer')">👨‍🏫 Trainer Portal</button>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;max-width:820px;margin:0 auto">
+          <button class="b" onclick="switchRole('learner')" style="box-shadow:0 0 20px rgba(56,189,248,0.4);font-size:15px;padding:10px 22px">🚀 Enter Trainee Workspace</button>
+          <button class="b o" onclick="go('mods')" style="font-size:15px;padding:10px 20px">🥽 3D VR Simulation Bay</button>
+          <button class="b bw" onclick="go('cadlab')" style="font-size:15px;padding:10px 20px">🔬 CAD 3D Model Lab</button>
+          <button class="b o" onclick="switchRole('trainer')" style="font-size:15px;padding:10px 20px">👨‍🏫 Instructor Portal</button>
+          <button class="b o" onclick="switchRole('admin')" style="font-size:15px;padding:10px 20px">🏛️ Admin Console</button>
         </div>
       </section>
 
-      <div class="w" style="margin-top:32px">
+      <div class="w" style="margin-top:20px">
         <!-- 3 Workspace Pillar Cards -->
+        <h2 style="margin-bottom:12px">🏢 Role Workspaces</h2>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:32px">
-          <div class="c cl" onclick="switchRole('learner')" style="border-left:4px solid #38bdf8">
-            <span style="font-size:36px">🎓</span>
-            <h3 style="margin:8px 0 4px">Learner Workspace</h3>
-            <p class="m" style="margin:0 0 10px;font-size:13px">Interactive 3D switchgear &amp; welding bay simulations, complete assigned work, inspect CAD assemblies, and earn tamper-evident Skill Passports.</p>
-            <span style="color:#38bdf8;font-weight:700;font-size:13px">Launch Trainee Dashboard ➔</span>
+          <div class="c cl" onclick="switchRole('learner')" style="border-left:4px solid #38bdf8;cursor:pointer;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <span style="font-size:32px">🎓</span>
+              <div>
+                <h3 style="margin:0">Learner Workspace</h3>
+                <span class="tag a" style="font-size:10px">Trainee Hands-On Portal</span>
+              </div>
+            </div>
+            <p class="m" style="margin:0 0 12px;font-size:13.5px">Execute high-voltage 415V switchgear isolations, MIG/TIG welding passes, CAD disassembly drills, and earn verified credentials.</p>
+            <button class="b" onclick="switchRole('learner');event.stopPropagation()" style="width:100%;font-size:13px">Launch Learner Dashboard ➔</button>
           </div>
 
-          <div class="c cl" onclick="switchRole('trainer')" style="border-left:4px solid #f59e0b">
-            <span style="font-size:36px">👨‍🏫</span>
-            <h3 style="margin:8px 0 4px">Trainer Workspace</h3>
-            <p class="m" style="margin:0 0 10px;font-size:13px">Monitor cohort safety analytics, build curriculum assignments, approve AI scenarios, digitally sign competencies, and dispatch targeted remediation.</p>
-            <span style="color:#f59e0b;font-weight:700;font-size:13px">Open Instructor Workspace ➔</span>
+          <div class="c cl" onclick="switchRole('trainer')" style="border-left:4px solid #f59e0b;cursor:pointer;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <span style="font-size:32px">👨‍🏫</span>
+              <div>
+                <h3 style="margin:0">Trainer Portal</h3>
+                <span class="tag wn" style="font-size:10px">Instructor &amp; Evaluator</span>
+              </div>
+            </div>
+            <p class="m" style="margin:0 0 12px;font-size:13.5px">Monitor real-time cohort safety infractions, build standardized curriculum drills, approve AI scenarios, and sign off skill passports.</p>
+            <button class="b o" onclick="switchRole('trainer');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#f59e0b;color:#f59e0b">Open Instructor Console ➔</button>
           </div>
 
-          <div class="c cl" onclick="switchRole('admin')" style="border-left:4px solid #8b5cf6">
-            <span style="font-size:36px">🏛️</span>
-            <h3 style="margin:8px 0 4px">Admin Workspace</h3>
-            <p class="m" style="margin:0 0 10px;font-size:13px">Multi-campus institution boundary management, user role permissions, approved course catalogue, and chronological governance audit trail.</p>
-            <span style="color:#8b5cf6;font-weight:700;font-size:13px">Access System Administration ➔</span>
+          <div class="c cl" onclick="switchRole('admin')" style="border-left:4px solid #8b5cf6;cursor:pointer;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <span style="font-size:32px">🏛️</span>
+              <div>
+                <h3 style="margin:0">Admin Console</h3>
+                <span class="tag" style="background:#8b5cf6;color:#fff;font-size:10px">Institutional Governance</span>
+              </div>
+            </div>
+            <p class="m" style="margin:0 0 12px;font-size:13.5px">Manage multi-campus institutions, student enrollments, accredited curricula, RBAC permissions, and chronological audit trails.</p>
+            <button class="b o" onclick="switchRole('admin');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#8b5cf6;color:#8b5cf6">Access Administration ➔</button>
+          </div>
+        </div>
+
+        <!-- Practical 3D Simulation Suites -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div>
+            <h2 style="margin:0">⚡ Hands-On Practical Simulation Suites</h2>
+            <p class="m" style="margin:4px 0 0">Interactive Three.js WebXR modules with spatial physics and real-time safety gate evaluation.</p>
+          </div>
+          <button class="b bw" onclick="go('mods')">View All Modules ➔</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:32px">
+          <div class="c cl" onclick="openMod('elec')" style="border-top:3px solid #38bdf8;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <span style="font-size:28px">⚡</span>
+              <span class="tag a">3D VR READY</span>
+            </div>
+            <h3 style="margin:8px 0 4px">Electrical Safety &amp; LOTO</h3>
+            <p class="m" style="font-size:13px;margin:0 0 12px">415V switchgear panel, lockout/tagout padlocking, multimeter 0.0V verification, and arc flash blast physics.</p>
+            <button class="b" onclick="openMod('elec');event.stopPropagation()" style="width:100%;font-size:13px">▶ Launch 3D Simulation</button>
+          </div>
+
+          <div class="c cl" onclick="openMod('weld')" style="border-top:3px solid #f97316;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <span style="font-size:28px">🔥</span>
+              <span class="tag wn">3D VR READY</span>
+            </div>
+            <h3 style="margin:8px 0 4px">Industrial Welding Bay</h3>
+            <p class="m" style="font-size:13px;margin:0 0 12px">Hot-work perimeter clearance, fume extractor exhaust, grounding clamp attachment, and Class B fire emergency drill.</p>
+            <button class="b" onclick="openMod('weld');event.stopPropagation()" style="width:100%;font-size:13px;background:linear-gradient(135deg,#ea580c,#c2410c)">▶ Launch Welding Bay</button>
+          </div>
+
+          <div class="c cl" onclick="go('cadlab')" style="border-top:3px solid #10b981;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <span style="font-size:28px">🔬</span>
+              <span class="tag ok">INTERACTIVE CAD</span>
+            </div>
+            <h3 style="margin:8px 0 4px">CAD / 3D Model Lab</h3>
+            <p class="m" style="font-size:13px;margin:0 0 12px">Inspect 6 engineering machinery assemblies, 0-100% exploded view slider, wireframe toggle, and precision calipers.</p>
+            <button class="b o" onclick="go('cadlab');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#10b981;color:#10b981">🔬 Open CAD Lab</button>
+          </div>
+
+          <div class="c cl" onclick="go('ai3d')" style="border-top:3px solid #a855f7;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <span style="font-size:28px">🤖</span>
+              <span class="tag" style="background:#a855f7;color:#fff">GROQ AI CORE</span>
+            </div>
+            <h3 style="margin:8px 0 4px">AI 3D World Gen</h3>
+            <p class="m" style="font-size:13px;margin:0 0 12px">Prompt any industrial workplace scenario in plain text. AI compiles 3D spatial layout and drops you directly into WebXR.</p>
+            <button class="b o" onclick="go('ai3d');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#a855f7;color:#a855f7">⚡ Launch AI World</button>
+          </div>
+
+          <div class="c cl" onclick="go('photo')" style="border-top:3px solid #ec4899;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <span style="font-size:28px">📸</span>
+              <span class="tag" style="background:#ec4899;color:#fff">VISION AI</span>
+            </div>
+            <h3 style="margin:8px 0 4px">Photo to Hazards</h3>
+            <p class="m" style="font-size:13px;margin:0 0 12px">Upload real workplace photos. Vision AI audits OSHA violations and converts photographic hazards into 3D simulations.</p>
+            <button class="b o" onclick="go('photo');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#ec4899;color:#ec4899">📸 Scan Workshop Photo</button>
+          </div>
+
+          <div class="c cl" onclick="go('passport')" style="border-top:3px solid #eab308;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <span style="font-size:28px">📜</span>
+              <span class="tag" style="background:#eab308;color:#04121c">TAMPER-EVIDENT</span>
+            </div>
+            <h3 style="margin:8px 0 4px">Verifiable Skill Passport</h3>
+            <p class="m" style="font-size:13px;margin:0 0 12px">Accredited student credentials with QR code verification, SHA-256 integrity hash, and instructor cryptographic signatures.</p>
+            <button class="b o" onclick="go('passport');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#eab308;color:#eab308">📜 View Skill Passport</button>
           </div>
         </div>
 
@@ -3655,4 +3743,7 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
   };
 
   console.log("SkillSafe VR Enterprise Views successfully loaded.");
+  if (typeof go === 'function' && window.curView) {
+    try { go(window.curView); } catch(e) { console.warn('Extension view refresh', e); }
+  }
 })();

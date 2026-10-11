@@ -629,6 +629,19 @@ app.get('/app', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Role workspace URL aliases
+app.get(['/trainer', '/instructor', '/trainer-portal'], (req, res) => {
+  res.redirect('/app?role=trainer');
+});
+
+app.get(['/admin', '/administrator'], (req, res) => {
+  res.redirect('/app?role=admin');
+});
+
+app.get(['/learner', '/trainee', '/dashboard'], (req, res) => {
+  res.redirect('/app?role=learner');
+});
+
 // Serve static files for authenticated app (JS, CSS, images, models, etc.)
 // These files are needed by index.html and platform_extension.js
 const staticExtensions = ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico',

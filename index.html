@@ -843,6 +843,27 @@ window.go = function(n) {
   if (typeof window._realGo === 'function') return window._realGo(n);
   window._pendingView = n;
 };
+window.switchRole = function(role) {
+  try {
+    const u = JSON.parse(localStorage.getItem('skillsafe_user') || '{}');
+    u.role = role;
+    localStorage.setItem('skillsafe_user', JSON.stringify(u));
+    if (window.S) window.S.role = role;
+  } catch(e) {}
+  if (typeof window.USER_AUTH_ROLE !== 'undefined') {
+    window.USER_AUTH_ROLE = role;
+  }
+  if (role === 'trainer') {
+    if (typeof goTrainerTab === 'function') goTrainerTab('overview');
+    else go('trainer');
+  } else if (role === 'admin') {
+    if (typeof goAdminTab === 'function') goAdminTab('institutions');
+    else go('admin');
+  } else {
+    go('dash');
+  }
+  if (typeof updateNavHeader === 'function') try{ updateNavHeader(); }catch(e){}
+};
 window.toggleMobileNav = function() {
   const d = document.getElementById('mobile-nav-drawer');
   const b = document.getElementById('mobile-nav-backdrop');
@@ -959,6 +980,11 @@ window.closeMobileNav = function() {
 const $=s=>document.querySelector(s),app=$('#app');
 const V=window.V={},I=window.I={};
 let S={name:'',hist:[],xp:0,streak:0,badges:[],last:''},cur=null,sim={run:false},st,demo=false,snd=1,AC;
+window.hud = function(){ if(typeof MOD!=='undefined'&&MOD=='w')return typeof hudW==='function'?hudW():''; return typeof hudE==='function'?hudE():''; };
+window.hud.last = -9;
+window.hudW = function(){};
+window.hudW.last = -9;
+
 try{const j=localStorage.getItem('ssvr');if(j)S=Object.assign(S,JSON.parse(j))}catch(e){}
 try{const au=JSON.parse(localStorage.getItem('skillsafe_user')||'{}');if(au.name)S.name=au.name;if(au.role)S.role=au.role;}catch(e){}
 const save=()=>{try{localStorage.setItem('ssvr',JSON.stringify(S))}catch(e){}};
@@ -1878,11 +1904,155 @@ function generateAICoachDebriefText(report, lang) {
 }
 
 // V and I already initialized at top
-V.home=()=>`<section class=hero><span class=tag>AR/VR VOCATIONAL TRAINING</span><h1>SkillSafe VR</h1><h2 style="color:var(--warn)">Learn. Practice. Fail Safely. Master Skills.</h2><p>An immersive AR/VR vocational training platform that allows learners to practice technical procedures and workplace safety in realistic simulated environments.</p>
-<div class=hb><button class=b onclick="go('dash')">Start Training</button><button class="b o" onclick="go('mods')">Explore Modules</button><button class="b o" onclick="go('inst')">For Instructors</button><button class="b o" onclick="document.getElementById('how').scrollIntoView()">How It Works</button><button class="b bw" onclick="startDemo()">▶ Hackathon Demo</button></div></section>
-<div class=w><h2 id=how>How it works</h2><div class=g>${['Practice safely','Detect mistakes','Learn why','Repeat','Measure improvement'].map((t,i)=>`<div class=c><span class=k>${i+1}</span><h3>${t}</h3><p class=m>${['Enter a simulated industrial workshop.','Rule-based engine flags unsafe actions instantly.','Feedback explains what, why and the correct procedure.','Retry with adaptive recommendations.','Scores, levels and reports track progress.'][i]}</p></div>`).join('')}</div>
-<h2>Roadmap</h2><div class=g>${['Electrical + Welding Safety ✔ (this prototype)','Welding + Construction','Automotive + Machine Operation','AI-powered personalised training','Multi-user instructor monitoring','Institutional deployment','Real AR/VR devices & equipment'].map((t,i)=>`<div class=c><span class="tag ${i?'':'a'}">Phase ${i+1}</span><p>${t}</p></div>`).join('')}</div>
-<p class=m>Simulated educational assessment — not an official professional certification. Architecture: modular engine (scenarios as data), storage adapter (swap localStorage → Supabase/Firebase), recommendation adapter (swap rules → AI API), renderer adapter (Three.js → Unity/WebXR).</p></div>`;
+V.home=()=>`
+<section class="hero" style="padding:48px 16px 36px;text-align:center">
+  <span class="tag" style="background:linear-gradient(135deg,#0284c7,#38bdf8);color:#fff;font-weight:700;letter-spacing:1px;padding:4px 12px;border-radius:20px">AR/VR VOCATIONAL TRAINING PLATFORM</span>
+  <h1 style="font-size:clamp(32px,5vw,52px);margin:14px 0 6px;letter-spacing:-1px">SkillSafe <span style="color:#38bdf8">VR</span></h1>
+  <h2 style="color:var(--warn);font-size:clamp(18px,3vw,26px);margin:0 0 14px;font-weight:700">Learn. Practice. Fail Safely. Master Skills.</h2>
+  <p style="max-width:760px;margin:0 auto 24px;font-size:16px;color:#cbd5e1;line-height:1.6">
+    An immersive AR/VR vocational engineering platform allowing technical trainees to practice high-voltage electrical procedures, industrial welding, and machine maintenance with <b>deterministic OSHA/AWS safety gates</b>, <b>Three.js WebXR simulations</b>, and <b>tamper-evident Skill Passports</b>.
+  </p>
+  <div class="hb" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;max-width:820px;margin:0 auto">
+    <button class="b" onclick="go('dash')" style="box-shadow:0 0 20px rgba(56,189,248,0.4);font-size:15px;padding:10px 22px">🚀 Enter Trainee Workspace</button>
+    <button class="b o" onclick="go('mods')" style="font-size:15px;padding:10px 20px">🥽 3D VR Simulation Bay</button>
+    <button class="b bw" onclick="go('cadlab')" style="font-size:15px;padding:10px 20px">🔬 CAD 3D Model Lab</button>
+    <button class="b o" onclick="switchRole('trainer')" style="font-size:15px;padding:10px 20px">👨‍🏫 Instructor Portal</button>
+    <button class="b o" onclick="switchRole('admin')" style="font-size:15px;padding:10px 20px">🏛️ Admin Console</button>
+  </div>
+</section>
+
+<div class="w" style="margin-top:20px">
+  <!-- Role Workspace Gateways -->
+  <h2 style="margin-bottom:12px">🏢 Role Workspaces</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:32px">
+    <div class="c cl" onclick="switchRole('learner')" style="border-left:4px solid #38bdf8;cursor:pointer;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:32px">🎓</span>
+        <div>
+          <h3 style="margin:0">Learner Workspace</h3>
+          <span class="tag a" style="font-size:10px">Trainee Hands-On Portal</span>
+        </div>
+      </div>
+      <p class="m" style="margin:0 0 12px;font-size:13.5px">Execute high-voltage 415V switchgear isolations, MIG/TIG welding passes, CAD disassembly drills, and earn verified credentials.</p>
+      <button class="b" onclick="switchRole('learner');event.stopPropagation()" style="width:100%;font-size:13px">Launch Learner Dashboard ➔</button>
+    </div>
+
+    <div class="c cl" onclick="switchRole('trainer')" style="border-left:4px solid #f59e0b;cursor:pointer;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:32px">👨‍🏫</span>
+        <div>
+          <h3 style="margin:0">Trainer Portal</h3>
+          <span class="tag wn" style="font-size:10px">Instructor &amp; Evaluator</span>
+        </div>
+      </div>
+      <p class="m" style="margin:0 0 12px;font-size:13.5px">Monitor real-time cohort safety infractions, build standardized curriculum drills, approve AI scenarios, and sign off skill passports.</p>
+      <button class="b o" onclick="switchRole('trainer');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#f59e0b;color:#f59e0b">Open Instructor Console ➔</button>
+    </div>
+
+    <div class="c cl" onclick="switchRole('admin')" style="border-left:4px solid #8b5cf6;cursor:pointer;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:32px">🏛️</span>
+        <div>
+          <h3 style="margin:0">Admin Console</h3>
+          <span class="tag" style="background:#8b5cf6;color:#fff;font-size:10px">Institutional Governance</span>
+        </div>
+      </div>
+      <p class="m" style="margin:0 0 12px;font-size:13.5px">Manage multi-campus institutions, student enrollments, accredited curricula, RBAC permissions, and chronological audit trails.</p>
+      <button class="b o" onclick="switchRole('admin');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#8b5cf6;color:#8b5cf6">Access Administration ➔</button>
+    </div>
+  </div>
+
+  <!-- Practical 3D Simulation Suites -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <div>
+      <h2 style="margin:0">⚡ Hands-On Practical Simulation Suites</h2>
+      <p class="m" style="margin:4px 0 0">Interactive Three.js WebXR modules with spatial physics and real-time safety gate evaluation.</p>
+    </div>
+    <button class="b bw" onclick="go('mods')">View All Modules ➔</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:32px">
+    <div class="c cl" onclick="openMod('elec')" style="border-top:3px solid #38bdf8;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span style="font-size:28px">⚡</span>
+        <span class="tag a">3D VR READY</span>
+      </div>
+      <h3 style="margin:8px 0 4px">Electrical Safety &amp; LOTO</h3>
+      <p class="m" style="font-size:13px;margin:0 0 12px">415V switchgear panel, lockout/tagout padlocking, multimeter 0.0V verification, and arc flash blast physics.</p>
+      <button class="b" onclick="openMod('elec');event.stopPropagation()" style="width:100%;font-size:13px">▶ Launch 3D Simulation</button>
+    </div>
+
+    <div class="c cl" onclick="openMod('weld')" style="border-top:3px solid #f97316;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span style="font-size:28px">🔥</span>
+        <span class="tag wn">3D VR READY</span>
+      </div>
+      <h3 style="margin:8px 0 4px">Industrial Welding Bay</h3>
+      <p class="m" style="font-size:13px;margin:0 0 12px">Hot-work perimeter clearance, fume extractor exhaust, grounding clamp attachment, and Class B fire emergency drill.</p>
+      <button class="b" onclick="openMod('weld');event.stopPropagation()" style="width:100%;font-size:13px;background:linear-gradient(135deg,#ea580c,#c2410c)">▶ Launch Welding Bay</button>
+    </div>
+
+    <div class="c cl" onclick="go('cadlab')" style="border-top:3px solid #10b981;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span style="font-size:28px">🔬</span>
+        <span class="tag ok">INTERACTIVE CAD</span>
+      </div>
+      <h3 style="margin:8px 0 4px">CAD / 3D Model Lab</h3>
+      <p class="m" style="font-size:13px;margin:0 0 12px">Inspect 6 engineering machinery assemblies, 0-100% exploded view slider, wireframe toggle, and precision calipers.</p>
+      <button class="b o" onclick="go('cadlab');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#10b981;color:#10b981">🔬 Open CAD Lab</button>
+    </div>
+
+    <div class="c cl" onclick="go('ai3d')" style="border-top:3px solid #a855f7;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span style="font-size:28px">🤖</span>
+        <span class="tag" style="background:#a855f7;color:#fff">GROQ AI CORE</span>
+      </div>
+      <h3 style="margin:8px 0 4px">AI 3D World Gen</h3>
+      <p class="m" style="font-size:13px;margin:0 0 12px">Prompt any industrial workplace scenario in plain text. AI compiles 3D spatial layout and drops you directly into WebXR.</p>
+      <button class="b o" onclick="go('ai3d');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#a855f7;color:#a855f7">⚡ Launch AI World</button>
+    </div>
+
+    <div class="c cl" onclick="go('photo')" style="border-top:3px solid #ec4899;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span style="font-size:28px">📸</span>
+        <span class="tag" style="background:#ec4899;color:#fff">VISION AI</span>
+      </div>
+      <h3 style="margin:8px 0 4px">Photo to Hazards</h3>
+      <p class="m" style="font-size:13px;margin:0 0 12px">Upload real workplace photos. Vision AI audits OSHA violations and converts photographic hazards into 3D simulations.</p>
+      <button class="b o" onclick="go('photo');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#ec4899;color:#ec4899">📸 Scan Workshop Photo</button>
+    </div>
+
+    <div class="c cl" onclick="go('passport')" style="border-top:3px solid #eab308;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span style="font-size:28px">📜</span>
+        <span class="tag" style="background:#eab308;color:#04121c">TAMPER-EVIDENT</span>
+      </div>
+      <h3 style="margin:8px 0 4px">Verifiable Skill Passport</h3>
+      <p class="m" style="font-size:13px;margin:0 0 12px">Accredited student credentials with QR code verification, SHA-256 integrity hash, and instructor cryptographic signatures.</p>
+      <button class="b o" onclick="go('passport');event.stopPropagation()" style="width:100%;font-size:13px;border-color:#eab308;color:#eab308">📜 View Skill Passport</button>
+    </div>
+  </div>
+
+  <!-- How It Works Section -->
+  <h2 id="how" style="margin-bottom:12px">🛠️ How SkillSafe VR Works</h2>
+  <div class="g" style="margin-bottom:32px">
+    <div class="c"><span class="k">1</span><h3>Practice Safely</h3><p class="m">Enter high-fidelity 3D industrial workshops on desktop or VR headset with realistic equipment physics.</p></div>
+    <div class="c"><span class="k">2</span><h3>Deterministic Safety Gate</h3><p class="m">Rule-based engine halts dangerous actions instantly (e.g. uninsulated tool contact triggers arc flash freeze-frame).</p></div>
+    <div class="c"><span class="k">3</span><h3>Learn Root Causes</h3><p class="m">Multilingual AI voice coach (English, Tamil, Hindi) explains WHY violations are dangerous in real workplaces.</p></div>
+    <div class="c"><span class="k">4</span><h3>Targeted Remediation</h3><p class="m">Adaptive recommendation engine delivers focused repetition drills to turn weak procedures into muscle memory.</p></div>
+    <div class="c"><span class="k">5</span><h3>Accredited Credentials</h3><p class="m">Scores, evidence streams, and verified competencies are cryptographically signed into the student's Skill Passport.</p></div>
+  </div>
+
+  <!-- Architecture Highlights -->
+  <h2>🏛️ Enterprise Accreditation &amp; Institutional Governance</h2>
+  <div class="g">
+    <div class="c"><span class="tag a">OSHA 1910.147</span><h3>Lockout / Tagout Standard</h3><p class="m">Zero-tolerance de-energization sequence compliant with federal occupational safety requirements.</p></div>
+    <div class="c"><span class="tag a">NFPA 70E</span><h3>Arc Flash PPE Compliance</h3><p class="m">Category IV 40 cal/cm² personal protective equipment donned prior to entering energized perimeter zones.</p></div>
+    <div class="c"><span class="tag a">AWS D1.1</span><h3>Structural Welding Code</h3><p class="m">Travel speed, electrode tilt angle, and shielding gas flow rate audited dynamically during torch trigger.</p></div>
+    <div class="c"><span class="tag a">WebXR / W3C</span><h3>Device Agnostic Architecture</h3><p class="m">Runs natively in Chrome, Edge, Safari, Meta Quest 2/3, and Android mobile without requiring proprietary app downloads.</p></div>
+  </div>
+</div>
+`;
 V.auth=()=>{ if(!localStorage.getItem('skillsafe_token')){window.location.replace('/login');return'';} setTimeout(()=>go('dash'),10); return '<div class=w style="text-align:center;padding:40px"><div class=c><h3>Loading Workspace...</h3></div></div>'; };
 let LID=0;const CH={};
 function mono(P){const n=P.length,dx=[],m=[],t=[];if(n<2)return'';for(let i=0;i<n-1;i++){dx[i]=P[i+1][0]-P[i][0];m[i]=(P[i+1][1]-P[i][1])/dx[i]}
@@ -2113,9 +2283,29 @@ V.qz=()=>{if(!QZ)return V.dash();if(QZ.i>=QZ.q.length){const p=Math.round(QZ.s*1
 function qzA(b,k){const q=QZ.q[QZ.i],ok=q.o[k]==q.a;if(ok)QZ.s++;b.style.borderColor=ok?'var(--ok)':'var(--crit)';say(ok?'Correct':'Not quite. '+q.a);setTimeout(()=>{QZ.i++;go('qz')},900)}
 function copyRep(){const s=cur,t=`SkillSafe VR report — ${S.name} · ${s.mod} · ${s.d}\nOverall ${s.score}% · Safety ${s.safety}% · Procedure ${s.proc}% · Hazard ${s.haz}% · Task ${s.task}% · Time ${s.te}% · Mistakes ${s.mist.length} · Level ${s.level}\n(Simulated assessment, not a certification)`;try{navigator.clipboard.writeText(t).then(()=>alert('Report summary copied'))}catch(e){prompt('Copy:',t)}}
 // ---- Router
-function go(n){if(n!='sim'){try{speechSynthesis.cancel()}catch(e){}}hud.last=-9;hudW.last=-9;sim.run=false;P3.run=0;clearInterval(window._pt);if(AR&&AR.iv){clearInterval(AR.iv);AR=null}if(sim.R){try{sim.R.setAnimationLoop(null);const xs=sim.R.xr.getSession();if(xs)xs.end()}catch(e){}try{sim.R.forceContextLoss()}catch(e){}sim.R.dispose();sim.R=0}K={};if(window._ms){window._ms.getTracks().forEach(t=>t.stop());window._ms=0}window.curView=n;app.innerHTML=V[n]();if(I[n])I[n]();window.scrollTo(0,0)}
+function go(n){
+  if(n!='sim'){try{speechSynthesis.cancel()}catch(e){}}
+  if(typeof hud !== 'undefined' && hud) try{ hud.last=-9; }catch(e){}
+  if(typeof hudW !== 'undefined' && hudW) try{ hudW.last=-9; }catch(e){}
+  if(typeof sim !== 'undefined' && sim) sim.run=false;
+  if(typeof P3 !== 'undefined' && P3) P3.run=0;
+  clearInterval(window._pt);
+  if(typeof AR !== 'undefined' && AR && AR.iv){clearInterval(AR.iv);AR=null}
+  if(typeof sim !== 'undefined' && sim && sim.R){try{sim.R.setAnimationLoop(null);const xs=sim.R.xr.getSession();if(xs)xs.end()}catch(e){}try{sim.R.forceContextLoss()}catch(e){}try{sim.R.dispose()}catch(e){}sim.R=0}
+  window.K={};
+  if(window._ms){window._ms.getTracks().forEach(t=>t.stop());window._ms=0}
+  window.curView=n;
+  const renderFn = (typeof V !== 'undefined' && V[n]) ? V[n] : null;
+  if (renderFn) {
+    app.innerHTML = renderFn();
+  }
+  if(typeof I !== 'undefined' && I[n]) try{ I[n](); }catch(e){ console.warn('Init error for view', n, e); }
+  if(typeof updateNavHeader === 'function') try{ updateNavHeader(); }catch(e){}
+  window.scrollTo(0,0);
+}
 window._realGo = go;
 window.go = go;
+
 if (window._pendingView) {
   const pv = window._pendingView;
   window._pendingView = null;
@@ -3512,7 +3702,16 @@ function startWeld(){MOD='w';go('sim');st={haz:new Set,pick:new Set,worn:0,clear
   if(Xr&&fl2%12==0){const c=ctl.find(c=>c.userData.h=='right')||ctl[0],o=rayC(c);if(o!==hov){if(hov)hl(hov,0);hov=o;if(o)hl(o,1)}const md=$('#md'),tp=$('#tip'),h=$('#hud');let L=[];
    if(mdOn()){L=md.innerText.split('\n').filter(x=>x.trim());L.push('','\u25B6 Trigger: continue')}else{L=[...(h?h.innerText.split('\n').filter(x=>x.trim()).slice(0,5):[]),o?'\u{1F446} '+NM[o.userData.id]:'',tp&&tp.style.display=='block'?tp.textContent:'','Trigger: interact \u00B7 L-stick: move \u00B7 R-stick: turn \u00B7 A wear \u00B7 B clear bay \u00B7 X weld \u00B7 Y hint']}pm.visible=true;paint(L)}
   R.render(sc,cam)};R.setAnimationLoop(loop)}
-go('home');
+try {
+  const _au = JSON.parse(localStorage.getItem('skillsafe_user') || '{}');
+  const _at = localStorage.getItem('skillsafe_token');
+  if (_at && _au.role === 'trainer') go('trainer');
+  else if (_at && _au.role === 'admin') go('admin');
+  else if (_at) go('dash');
+  else go('home');
+} catch(e) {
+  go('home');
+}
 
 
 // =========================================================================

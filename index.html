@@ -979,8 +979,15 @@ window.closeMobileNav = function() {
 <script>
 const $=s=>document.querySelector(s),app=$('#app');
 const V=window.V={},I=window.I={};
-let S={name:'',hist:[],xp:0,streak:0,badges:[],last:''},cur=null,sim={run:false},st,demo=false,snd=1,AC;
-window.hud = function(){ if(typeof MOD!=='undefined'&&MOD=='w')return typeof hudW==='function'?hudW():''; return typeof hudE==='function'?hudE():''; };
+var S={name:'',hist:[],xp:0,streak:0,badges:[],last:''},cur=null,sim={run:false},st,demo=false,snd=1,AC;
+window.hud = function(){
+  if(typeof MOD!=='undefined'){
+    if(MOD=='w')return typeof hudW==='function'?hudW():'';
+    if(MOD=='c')return typeof hudC==='function'?hudC():'';
+    if(MOD=='m')return typeof hudM==='function'?hudM():'';
+  }
+  return typeof hudE==='function'?hudE():'';
+};
 window.hud.last = -9;
 window.hudW = function(){};
 window.hudW.last = -9;
@@ -995,7 +1002,7 @@ const avg=(a,k)=>a.length?Math.round(a.reduce((s,x)=>s+x[k],0)/a.length):0;
 const col=v=>v>=85?'ok':v>=65?'wn':'cr';
 const STEPS=['Identify the electrical hazard','Select PPE (helmet, gloves, goggles)','Wear PPE','Identify the correct breaker','Switch off the power','Verify the system is safe','Select the appropriate tool','Perform simulated maintenance','Inspect the work area','Restore the system safely'];
 const TIPS=['Click the HIGH VOLTAGE sign on the panel wall.','Pick up all 3 PPE items from the workbench, then press Wear PPE.','Press the Wear PPE button.','Click breaker B3 (matches the work order on the panel).','Click B3 again to switch it off.','Pick up the voltage tester (it goes in your right hand), then touch it to the panel: click the panel or press E.','Pick up the screwdriver (not the hammer).','Click the panel (or press E) to use the screwdriver.','Press Inspect work area.','Click B3 to restore power.'];
-const MT={ppe:12,iso:15,zone:12,tool:8,seq:8},MN={ppe:'PPE / safety preparation',iso:'Isolation procedure',zone:'Hazard zone entry',tool:'Incorrect tool',seq:'Procedure sequencing'};
+const MT={ppe:12,iso:15,zone:12,tool:8,seq:8,fire:15,vent:10,gnd:10,fall:15,bar:10,anc:12,guard:15,estop:12,hands:15,loto:12},MN={ppe:'PPE / safety preparation',iso:'Isolation procedure',zone:'Hazard zone entry',tool:'Incorrect tool',seq:'Procedure sequencing',fire:'Flammables / Fire risk',vent:'Fume ventilation inactive',gnd:'Earth clamp missing',fall:'Work at height fall protection',bar:'Drop zone barricade missing',anc:'Safety harness lifeline unclipped',guard:'Machine safety guard open',estop:'Emergency stop drill error',hands:'Reaching into moving parts',loto:'Lockout/Tagout not established'};
 function ds(n,sc,sf,pr,m){const d=new Date(Date.now()-n*864e5);return{d:d.toLocaleDateString(),mod:'Electrical Safety',score:sc,safety:sf,proc:pr,haz:80,task:90,te:80,time:200,mist:m,level:lvl(sc),hints:0}}
 // ---- Recommendation engine (rule-based; swap body for an AI/FastAPI call later, same input/output shape)
 function recommend(h){
@@ -1894,11 +1901,19 @@ function generateAICoachDebriefText(report, lang) {
     return "Flawless execution! You respected every critical safety boundary, proved zero energy before touching conductors, and demonstrated professional compliance. This discipline prevents catastrophic industrial fatalities.";
   }
   const explanations = mists.map(m => {
-    if (m === 'ppe') return "• PPE Omission: At 480 volts, touching conductors without ASTM D120 insulated gloves allows current to enter your hands and pass through your heart cavity, causing fatal ventricular fibrillation in milliseconds.";
-    if (m === 'iso') return "• Maintenance Before Isolation: Applying metal tools before switching off Breaker B3 causes an instantaneous phase-to-ground arc flash at 19,400°C (35,000°F), vaporizing copper and generating explosive shockwaves.";
-    if (m === 'seq') return "• Procedural Sequencing Error: Verifying before isolating creates false security. The mandatory standard is: ISOLATE -> LOCKOUT/TAGOUT -> VERIFY ZERO ENERGY with a calibrated tester.";
-    if (m === 'tool') return "• Uninsulated Tool Selection: Using standard metal hand tools creates a low-resistance path for fault current directly into your palm.";
-    return "• Safety Violation: Skipping protocol steps compromises system containment and risks life.";
+    if (m === 'ppe') return "• PPE Omission: Working without certified PPE exposes vital organs to arc flash, severe burns, eye trauma, or head injuries.";
+    if (m === 'iso') return "• Maintenance Before Isolation: Operating or touching machinery before isolating power risks instantaneous arc flash or rotating component entanglement.";
+    if (m === 'seq') return "• Procedural Sequencing Error: Safety controls must precede operation (Isolate -> Lockout -> Verify; Inspect -> Barricade -> Anchor; Guard -> E-Stop test -> Feed).";
+    if (m === 'tool') return "• Unsafe Tool Selection: Using incorrect tools or bare hands instead of insulated screwdrivers, feed sticks, or chip brushes causes severe trauma.";
+    if (m === 'fall' || m === 'anc') return "• Fall Protection Violation: Working at height without anchoring to an OSHA-compliant lifeline risks fatal gravity falls.";
+    if (m === 'bar' || m === 'zone') return "• Drop / Hazard Zone Breach: Entering or leaving ground drop zones unbarricaded risks dropped objects striking personnel.";
+    if (m === 'guard') return "• Safety Guard Interlock Bypassed: Operating high-speed rotating chucks without locked polycarbonate shields causes catastrophic ejection or entanglement injuries.";
+    if (m === 'estop') return "• Emergency Stop Drill Error: When equipment malfunctions or runaway vibration occurs, palm E-Stop must be slammed immediately.";
+    if (m === 'hands') return "• Bare Hands Near Moving Parts: Razor-sharp metal swarf or rotating chucks will cause deep lacerations and crush injuries. Always use the bench brush and push stick.";
+    if (m === 'loto') return "• Lockout/Tagout Omitted: Stored mechanical or electrical energy can unexpectedly restart machinery during maintenance unless locked out with your personal padlock.";
+    if (m === 'fire') return "• Hot Work Fire Hazard: Striking an arc near flammables or without an extinguisher causes rapid uncontained workshop fires.";
+    if (m === 'vent') return "• Fume Ventilation Inactive: Inhaling welding smoke and metal oxides causes severe respiratory illness.";
+    return "• Safety Violation: Skipping protocol steps compromises system containment and risks human life.";
   });
   return "Why Each Mistake Matters in Real Life:\n" + explanations.join("\n");
 }
@@ -1990,6 +2005,26 @@ V.home=()=>`
       <h3 style="margin:8px 0 4px">Industrial Welding Bay</h3>
       <p class="m" style="font-size:13px;margin:0 0 12px">Hot-work perimeter clearance, fume extractor exhaust, grounding clamp attachment, and Class B fire emergency drill.</p>
       <button class="b" onclick="openMod('weld');event.stopPropagation()" style="width:100%;font-size:13px;background:linear-gradient(135deg,#ea580c,#c2410c)">▶ Launch Welding Bay</button>
+    </div>
+
+    <div class="c cl" onclick="openMod('con')" style="border-top:3px solid #eab308;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span style="font-size:28px">🏗️</span>
+        <span class="tag a" style="background:#ca8a04;color:#fff">3D VR READY</span>
+      </div>
+      <h3 style="margin:8px 0 4px">Construction Safety</h3>
+      <p class="m" style="font-size:13px;margin:0 0 12px">Multi-tier steel scaffolding, green Scafftag, drop-zone barricading, lifeline D-ring anchor, and bolt torque fixing at height.</p>
+      <button class="b" onclick="openMod('con');event.stopPropagation()" style="width:100%;font-size:13px;background:linear-gradient(135deg,#ca8a04,#a16207)">▶ Launch Construction 3D</button>
+    </div>
+
+    <div class="c cl" onclick="openMod('mac')" style="border-top:3px solid #06b6d4;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span style="font-size:28px">⚙️</span>
+        <span class="tag a" style="background:#0891b2;color:#fff">3D VR READY</span>
+      </div>
+      <h3 style="margin:8px 0 4px">Machine Operation</h3>
+      <p class="m" style="font-size:13px;margin:0 0 12px">Heavy metalworking lathe chuck, interlocked polycarbonate guard, palm E-Stop trip test, swarf brush, and LOTO switch.</p>
+      <button class="b" onclick="openMod('mac');event.stopPropagation()" style="width:100%;font-size:13px;background:linear-gradient(135deg,#0891b2,#0e7490)">▶ Launch Machine 3D</button>
     </div>
 
     <div class="c cl" onclick="go('cadlab')" style="border-top:3px solid #10b981;cursor:pointer">
@@ -2098,7 +2133,12 @@ V.dash=()=>{if(!S.name)S.name='Trainee';const h=S.hist,sk=avg(h.slice(-3),'score
 <div class=c><h3>Recent sessions <span class=m>(click a row)</span></h3><div class="table-responsive"><table><tr><th>Date<th>Score<th>Safety<th>Procedure<th>Mistakes<th>Level</tr>${h.slice(-5).reverse().map((s,i)=>`<tr class=cl onclick="const e=$('#sd${i}');e.style.display=e.style.display=='none'?'table-row':'none'"><td>${s.d}<td>${s.score}%<td>${s.safety}%<td>${s.proc}%<td>${s.mist.length}<td>${s.level}</tr><tr id=sd${i} style="display:none"><td colspan=6 class=m>⏱ ${s.time}s · Hints ${s.hints||0} · Hazard ${s.haz}% · Task ${s.task}%<br>${s.mist.map(m=>'⚠ '+MN[m]).join(' · ')||'No mistakes'}</tr>`).join('')||'<tr><td colspan=6 class=m>No sessions yet</tr>'}</table></div></div><br>
 <div class=c><h3>Achievements</h3>${S.badges.map(b=>`<span class="tag a">🏆 ${b}</span> `).join('')||'<span class=m>None yet — complete a scenario.</span>'}</div></div>`};
 I.dash=()=>{document.querySelectorAll('[data-n]').forEach(e=>{const n=+e.dataset.n,sf=e.dataset.s||'',t0=performance.now();(function f(t){const p=Math.min(1,(t-t0)/700);e.textContent=Math.round(n*(1-Math.pow(1-p,3)))+sf;if(p<1&&document.body.contains(e))requestAnimationFrame(f)})(t0)})};
-V.brief=()=>MOD=='w'?V.briefW():`<div class=w style="max-width:760px"><h1>⚡ Electrical Safety — Introduction</h1><div class=c><h3>Task</h3><p><b>Safely prepare the electrical panel for maintenance and perform the simulated maintenance procedure.</b></p><h3>Safety instructions</h3><ul><li>Simulated educational environment — not a real electrical repair guide.</li><li>Never touch equipment without PPE.</li><li>Avoid the yellow/black restricted zone.</li></ul><h3>Required sequence</h3><ol>${STEPS.map(s=>`<li>${s}</li>`).join('')}</ol><p class=m>Controls: drag to look · W A S D / arrows to move (on-screen pad on touch devices) · click objects · 💡 Hint shows the next step.</p><button class=b onclick="startSim()">Enter Virtual Workshop</button></div></div>`;
+V.brief=()=>{
+  if(MOD=='w')return V.briefW();
+  if(MOD=='c'&&V.briefC)return V.briefC();
+  if(MOD=='m'&&V.briefM)return V.briefM();
+  return `<div class=w style="max-width:760px"><h1>⚡ Electrical Safety — Introduction</h1><div class=c><h3>Task</h3><p><b>Safely prepare the electrical panel for maintenance and perform the simulated maintenance procedure.</b></p><h3>Safety instructions</h3><ul><li>Simulated educational environment — not a real electrical repair guide.</li><li>Never touch equipment without PPE.</li><li>Avoid the yellow/black restricted zone.</li></ul><h3>Required sequence</h3><ol>${STEPS.map(s=>`<li>${s}</li>`).join('')}</ol><p class=m>Controls: drag to look · W A S D / arrows to move (on-screen pad on touch devices) · click objects · 💡 Hint shows the next step.</p><button class=b onclick="startSim()">Enter Virtual Workshop</button></div></div>`;
+};
 V.sim=()=>`<div id=sw style="position:relative;height:calc(100vh - 62px)"><canvas id=cv style="width:100%;height:100%;display:block;touch-action:none"></canvas><div id=ppeov class=ppeov><div class=brim></div><div class=gog></div></div><div id=emv class=emv></div><div id=pfx class=pfx><div class=pst><span id=p1>🪖 Helmet</span><span id=p2>🥽 Goggles</span><span id=p3>🧤 Gloves</span></div><div id=pmsg class=pmsg></div></div><div id=hud class=hud></div><div class=ol id=ol></div><div id=tt></div><div id=tip class=tip></div><div class=md id=md></div>
 <div class=dp>${[['w','▲',2,1],['a','◀',1,2],['s','▼',2,2],['d','▶',3,2]].map(k=>`<button style="grid-column:${k[2]};grid-row:${k[3]}" onpointerdown="K.${k[0]}=1" onpointerup="K.${k[0]}=0" onpointerleave="K.${k[0]}=0" onpointercancel="K.${k[0]}=0">${k[1]}</button>`).join('')}</div>
 <div class=sb><button class="b bw" onclick="wear()">🦺 Wear PPE</button><button class="b bw" onclick="insp()">🔍 Inspect work area</button><button class="b bw" onclick="useTool()">✋ Use tool (E)</button><button class="b o" style="color:#fff" onclick="putAway()">🤲 Put away</button><button class="b o" style="color:#fff" onclick="hint()">💡 Hint</button><button class="b o vmic-btn" style="color:#fff" onclick="toggleVRMic()" title="Hands-free Voice AI (Press V)">🎤 Voice AI (V)</button><button class="b o vbt" style="color:#fff" onclick="togVO()">${VO?'🗣️ Voice ON':'🗣️ Voice OFF'}</button><button class="b o" style="color:#fff" onclick="snd=!snd;this.textContent=snd?'🔊':'🔇'">🔊</button><button class="b o" style="color:#fff" onclick="enterVR()">🥽 Enter VR</button><button class="b o" style="color:#fff" onclick="go('dash')">Exit</button><span>Drag = look · WASD = move · Click = interact</span></div></div>`;
@@ -2138,7 +2178,7 @@ V.inst=()=>{
 <div class=g style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"><div class=c><h3>Common mistakes</h3>${bars(cm)}</div><div class=c><h3>Active Cohort</h3><div class=m>${trainees.length} trainees enrolled</div></div></div><br>
 <div class=c><h3>Individual trainee performance</h3><div class="table-responsive"><table><tr><th>Trainee<th>Skill<th>Safety<th>Level</tr>${all.map(r=>`<tr><td>${r[0]}<td class=${col(r[1])}>${r[1]}%<td class=${col(r[2])}>${r[2]}%<td>${r[3]}</tr>`).join('')}</table></div></div>${S.hist.length?`<br><div class=c><h3>${S.name} — progress</h3>${line(S.hist.map(s=>s.score))}</div>`:''}</div>`};
 // ---- AR mode (simulated detection; replace scan() with WebXR/AR Foundation/marker tracking)
-let cm='elec',ps=null;
+var cm='elec',ps=null;
 const MODS={
 elec:{i:'⚡',n:'Electrical Safety',d:'Industrial Electrical Panel Maintenance + emergency drill (3D workshop)',ppe:['p1','p2','p3'],
  it:[['h1','⚡','High-Voltage Panel','Hazard: energised equipment.','h'],['h2','🚧','Restricted Zone Sign','Hazard: restricted area.','h'],['p1','🪖','Helmet','PPE protects from workplace hazards.','p'],['p2','🧤','Insulated Gloves','PPE protects from workplace hazards.','p'],['p3','🥽','Goggles','PPE protects from workplace hazards.','p'],['brk','🔌','Identify & Switch Off Breaker B3','Isolation: follow the work order.','g'],['tst','📟','Voltage Tester','Verify the simulated system is de-energised.','g'],['scr','🪛','Insulated Screwdriver','Task-appropriate simulated tool.','g'],['mnt','🔧','Perform Simulated Maintenance','Only after isolation + verification.','g'],['ins','🔍','Inspect Work Area','Check area is clear.','g'],['rst','🔁','Restore System','Restore only after inspection.','g'],['x1','🔨','Hammer',0,['tool','⚠ Incorrect Tool','Review the task requirements and try again.','Choose the insulated screwdriver.']]],
@@ -2158,9 +2198,19 @@ aut:{i:'🚗',n:'Automotive Maintenance',d:'Vehicle securing, battery isolation 
 emr:{i:'🚨',n:'Emergency Response',d:'Fire alarm: raise alarm, evacuate and account for everyone (simulated)',ppe:[],
  it:[['h1','🔥','Smoke / Fire Source','Hazard: spreading fire.','h'],['h2','🚪','Blocked Exit','Hazard: use another exit.','h'],['al','🔔','Raise the Alarm','Alert everyone first.','g'],['ot','📣','Alert Others Nearby','Help others leave.','g'],['es','🛑','Stop Equipment (E-stop)','Make machines safe if it is safe to do so.','g'],['fx','🧯','Small Fire Only: Use Extinguisher','Never fight a growing fire.','g'],['ex','🚪','Use Nearest Safe Exit','Walk, do not run.','g'],['as','📍','Go to Assembly Point','Stay there until cleared.','g'],['hc','📋','Report Headcount','Account for everyone.','g'],['x1','🛗','Use the Lift',0,['zone','⚠ Hazard Zone','Lifts can fail during fires.','Use the stairs or exit.']],['x2','🎒','Go Back for Belongings',0,['seq','⚠ Unsafe Procedure','Never re-enter to collect items.','Go straight to the assembly point.']]],
  st:[['Identify the hazards',['h1','h2']],['Raise the alarm',['al']],['Alert others',['ot']],['Stop equipment',['es']],['Fire assessment',['fx']],['Evacuate',['ex']],['Assemble and report',['as','hc']]]}};
-const retry=()=>go(cm=='elec'||cm=='weld'?'brief':'pb');
-function openMod(id){cm=id;const d3=id=='elec'||id=='weld';if(d3)MOD=id=='weld'?'w':'e';go(d3?'brief':'pb')}
-V.mods=()=>`<div class=w><h1>Training Modules</h1><p class=m>Modules are data-driven scenarios — new ones plug in without changing the engine.</p><div class=g>${Object.keys(MODS).map(k=>{const m=MODS[k];return`<div class=c><div class=k>${m.i}</div><h3>${m.n}</h3><span class="tag a">Available</span> <span class=tag>${k=='elec'||k=='weld'?'Full 3D workshop':'3D view + cards'}</span><p class=m>${m.d}</p><button class=b onclick="openMod('${k}')">Open module</button></div>`}).join('')}<div class=c><div class=k>➕</div><h3>More modules</h3><span class=tag>Plug-in</span><p class=m>Healthcare and others: add a data entry, no engine changes.</p></div></div></div>`;
+const retry=()=>go(cm=='elec'||cm=='weld'||cm=='con'||cm=='mac'?'brief':'pb');
+function openMod(id){
+  cm=id;
+  const d3=(id=='elec'||id=='weld'||id=='con'||id=='mac');
+  if(d3){
+    if(id=='weld')MOD='w';
+    else if(id=='con')MOD='c';
+    else if(id=='mac')MOD='m';
+    else MOD='e';
+  }
+  go(d3?'brief':'pb');
+}
+V.mods=()=>`<div class=w><h1>Training Modules</h1><p class=m>Modules are data-driven scenarios — new ones plug in without changing the engine.</p><div class=g>${Object.keys(MODS).map(k=>{const m=MODS[k];return`<div class=c><div class=k>${m.i}</div><h3>${m.n}</h3><span class="tag a">Available</span> <span class=tag>${k=='elec'||k=='weld'||k=='con'||k=='mac'?'Full 3D workshop':'3D view + cards'}</span><p class=m>${m.d}</p><button class=b onclick="openMod('${k}')">Open module</button></div>`}).join('')}<div class=c><div class=k>➕</div><h3>More modules</h3><span class=tag>Plug-in</span><p class=m>Healthcare and others: add a data entry, no engine changes.</p></div></div></div>`;
 V.pb=()=>{const m=MODS[cm];return`<div class=w style="max-width:760px"><h1>${m.i} ${m.n} — Introduction</h1><div class=c><p class=m>${m.d}. Simulated educational environment, not a real-world instruction guide.</p><h3>Required sequence</h3><ol>${m.st.map(x=>`<li>${x[0]}</li>`).join('')}</ol><p class=m>Select equipment cards in the correct order. Unsafe or out-of-order actions trigger a safety warning and lower your score.</p><button class=b onclick="psStart()">Start scenario</button> <button class="b o" onclick="go('ar')">Try in AR mode</button></div></div>`};
 // ---- Generic procedure engine (shared by scenario view and AR)
 function psStart(m){ps={m:m||cm,done:new Set,mist:[],haz:new Set,t0:Date.now(),ar:0};cm=ps.m;go('ps')}
@@ -2335,8 +2385,39 @@ window.putAway = function() {
     if (typeof beep === 'function') beep(380, 0.08);
   }
 };
-function useTool(){if(MOD=='w')return weldNow();if(!st||!sim.run||st.phase!='basic')return;if(!sim.held||!sim.held())return tip('Pick up the voltage tester or screwdriver first.');pickObj('panel')}
-function hint(){if(!st)return;if(MOD=='w'){if(st.phase=='em')return tip('💡 Click the fire, press the wall alarm, grab the extinguisher, click the fire base, then walk to the green assembly area.');const i=wprog().indexOf(false);if(i>=0){st.hints++;tip('💡 '+WTIPS[i])}return}if(st.phase=='em')return tip('💡 Click the machine, then the E-stop, then walk to the green assembly area.');if(st.phase!='basic')return;const i=prog().indexOf(false);if(i>=0){st.hints++;tip('💡 '+TIPS[i])}}
+function useTool(){
+  if(MOD=='w')return weldNow();
+  if(MOD=='c'&&window.conFixNow)return window.conFixNow();
+  if(MOD=='m'&&window.macFeedNow)return window.macFeedNow();
+  if(!st||!sim.run||st.phase!='basic')return;
+  if(!sim.held||!sim.held())return tip('Pick up the voltage tester or screwdriver first.');
+  pickObj('panel');
+}
+function hint(){
+  if(!st)return;
+  if(MOD=='w'){
+    if(st.phase=='em')return tip('💡 Click the fire, press the wall alarm, grab the extinguisher, click the fire base, then walk to the green assembly area.');
+    const i=wprog().indexOf(false);
+    if(i>=0){st.hints++;tip('💡 '+WTIPS[i]);}
+    return;
+  }
+  if(MOD=='c'){
+    if(st.phase=='em')return tip('🚨 Click the air horn, barricade the drop zone, then walk to the muster point.');
+    const i=(window.cprog?window.cprog():[]).indexOf(false);
+    if(i>=0){st.hints++;tip('💡 '+(window.CTIPS?window.CTIPS[i]:''));}
+    return;
+  }
+  if(MOD=='m'){
+    if(st.phase=='em')return tip('🚨 Hit the red E-Stop button, switch off the main disconnect, then evacuate.');
+    const i=(window.mprog?window.mprog():[]).indexOf(false);
+    if(i>=0){st.hints++;tip('💡 '+(window.MTIPS?window.MTIPS[i]:''));}
+    return;
+  }
+  if(st.phase=='em')return tip('💡 Click the machine, then the E-stop, then walk to the green assembly area.');
+  if(st.phase!='basic')return;
+  const i=prog().indexOf(false);
+  if(i>=0){st.hints++;tip('💡 '+TIPS[i]);}
+}
 const ppeRow=()=>'<div class=pc>'+[['helmet','🪖 Helmet'],['goggles','🥽 Goggles'],['gloves','🧤 Gloves']].map(a=>`<span class="${st.worn?'on':st.pick.has(a[0])?'pk':''}">${a[1]}${st.worn?' ✓':st.pick.has(a[0])?' · ready':''}</span>`).join('')+'</div>';
 const ELEC_GUIDE = [
   {
@@ -2548,6 +2629,8 @@ function mist(t,title,why,fix){
   const m=$('#md');m.style.display='flex';m.innerHTML=`<div><h2 class=cr>${title}</h2><p><b>What went wrong:</b> ${why}</p><p><b>Why unsafe:</b> Skipping or reordering safety steps exposes people and equipment to hazards.</p><p class=ok><b>Correct procedure:</b> ${fix}</p><button class=b onclick="$('#md').style.display='none'">Retry</button></div>`}
 function wear(){
   if(MOD=='w')return wearW();
+  if(MOD=='c'&&window.wearC)return window.wearC();
+  if(MOD=='m'&&window.wearM)return window.wearM();
   if(st.phase!='basic')return;
   if(st.worn)return tip('You are already wearing your PPE.');
   if(sim.busy&&sim.busy())return;
@@ -2562,6 +2645,8 @@ function wear(){
 }
 function insp(){
   if(MOD=='w')return sim.pick&&sim.pick('can');
+  if(MOD=='c'&&sim.pick)return sim.pick('ins');
+  if(MOD=='m'&&sim.pick)return sim.pick('gd');
   if(st.phase!='basic')return;
   if(!st.maint)return tip('Nothing to inspect yet.');
   if(st.insp)return tip('Work area already inspected.');
@@ -2710,8 +2795,36 @@ function pickObj(id){
   }
   after();
 }
-function finish(){$('#md').style.display='none';sim.run=false;const p=MOD=='w'?wprog():prog(),done=p.filter(x=>x).length,t=Math.round((Date.now()-st.t0)/1e3),c=st.mist.reduce((a,m)=>a+MT[m],0),pe=st.mist.filter(m=>m!='ppe'&&m!='zone').length,zn=st.mist.filter(m=>m=='zone').length;
- const em=st.em?cl(100-Math.max(0,((st.em.t==null?60:st.em.t)-20))*2-st.em.err*10):null,s={d:new Date().toLocaleDateString(),mod:MOD=='w'?'Welding Safety':'Electrical Safety',safety:cl(100-c),proc:cl(100*10/(10+pe)),haz:cl(st.haz.size*50-zn*10),task:Math.round(done*100/p.length),te:cl(t<=120?100:100-(t-120)/3,40),time:t,mist:[...st.mist],em,hints:st.hints,lk:st.lock};commit(s)}
+function finish(){
+  $('#md').style.display='none';
+  sim.run=false;
+  let p, modName;
+  if(MOD=='w'){ p = wprog(); modName = 'Welding Safety'; }
+  else if(MOD=='c'){ p = window.cprog ? window.cprog() : []; modName = 'Construction Safety'; }
+  else if(MOD=='m'){ p = window.mprog ? window.mprog() : []; modName = 'Machine Operation'; }
+  else { p = prog(); modName = 'Electrical Safety'; }
+  const done=p.filter(x=>x).length,
+        t=Math.round((Date.now()-st.t0)/1e3),
+        c=st.mist.reduce((a,m)=>a+(MT[m]||10),0),
+        pe=st.mist.filter(m=>m!='ppe'&&m!='zone').length,
+        zn=st.mist.filter(m=>m=='zone').length;
+  const em=st.em?cl(100-Math.max(0,((st.em.t==null?60:st.em.t)-20))*2-(st.em.err||0)*10):null,
+        s={
+          d:new Date().toLocaleDateString(),
+          mod:modName,
+          safety:cl(100-c),
+          proc:cl(100*10/(10+pe)),
+          haz:cl(st.haz.size*50-zn*10),
+          task:Math.round(done*100/(p.length||1)),
+          te:cl(t<=120?100:100-(t-120)/3,40),
+          time:t,
+          mist:[...st.mist],
+          em,
+          hints:st.hints,
+          lk:st.lock
+        };
+  commit(s);
+}
 function commit(s){const em=s.em;
  s.score=cl(.3*s.safety+.25*s.proc+.15*s.haz+.2*s.task+.1*s.te);s.level=lvl(s.score);
  s.nb=[];const add=b=>{if(!S.badges.includes(b)){S.badges.push(b);s.nb.push(b)}};if(!s.mist.length)add('Safety First');if(s.haz==100)add('Hazard Hunter');if(s.proc>=90)add('Procedure Master');if(em!=null&&em>=85)add('Quick Responder');if(s.te>=95)add('Speed Runner');if(s.hints===0&&s.score>=85)add('No Hints Needed');
@@ -3021,13 +3134,18 @@ function startSim(){go('sim');st={haz:new Set,pick:new Set,worn:0,ident:0,iso:0,
 window.K={};addEventListener('keydown',e=>{if(e.target.tagName=='INPUT')return;if(e.key.toLowerCase()=='e'&&sim.run&&st)useTool();K[e.key.toLowerCase()]=1});addEventListener('keyup',e=>K[e.key.toLowerCase()]=0);addEventListener('blur',()=>{K={}});
 function enterVR(){sim.enterVR?sim.enterVR():tip('Start the simulation first.')}
 // ================= Welding Safety module =================
-let MOD='e';
+var MOD='e';
 const WSTEPS=['Read the hot-work hazard sign','Pick up PPE (helmet, gloves, apron)','Wear PPE','Clear flammables from the bay','Check the fire extinguisher is in reach','Switch on fume extraction','Attach the work clamp to the workpiece','Set WPS parameters and weld the joint','Switch off the welder and let the metal cool'];
 const WTIPS=['Click the HOT WORK sign on the back wall.','Pick up the helmet, gloves and apron from the bench, then press Wear PPE.','Press the Wear PPE button.','Click the red fuel can / cardboard (or press Inspect) to move them away.','Click the fire extinguisher on the wall.','Click the fume extractor.','Click the work clamp on the table.','Click the workpiece (or press E), set current, travel speed and arc length inside the WPS window, then confirm.','Click the welding machine to switch it off.'];
 Object.assign(MT,{fire:15,vent:10,gnd:10,wps:10});Object.assign(MN,{wps:'Weld outside WPS window',fire:'Fire hazard not cleared',vent:'Fume extraction off',gnd:'Work clamp not attached'});
 const wppe=()=>'<div class=pc>'+[['helmet','🪖 Helmet'],['gloves','🧤 Gloves'],['apron','🦺 Apron']].map(a=>`<span class="${st.worn?'on':st.pick.has(a[0])?'pk':''}">${a[1]}${st.worn?' ✓':st.pick.has(a[0])?' · ready':''}</span>`).join('')+'</div>';
 const wprog=()=>[st.haz.has('sign1'),st.pick.size==3,st.worn,st.clear,st.ext,st.vent,st.clamp,st.weld,st.off].map(Boolean);
-function hud(){return MOD=='w'?hudW():hudE()}
+function hud(){
+  if(MOD=='w')return hudW();
+  if(MOD=='c'&&window.hudC)return window.hudC();
+  if(MOD=='m'&&window.hudM)return window.hudM();
+  return hudE();
+}
 const WELD_GUIDE = [
   {
     title: 'Hot-Work Hazard Warning',
@@ -5468,8 +5586,9 @@ function startAIProceduralSimulation(spec){
 <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
 <script src="qrcode.bundle.js"></script>
-<script src="platform_extension.js?v=20261011_v15"></script>
-<script src="views_extension.js?v=20261011_v15"></script>
+<script src="platform_extension.js?v=20261012_v1"></script>
+<script src="views_extension.js?v=20261012_v1"></script>
+<script src="workshops_extension.js?v=20261012_v1"></script>
 <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 <script src="ar_module.js?v=20261011_v3"></script>

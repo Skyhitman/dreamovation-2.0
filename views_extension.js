@@ -3527,7 +3527,7 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
           <span>⚡</span> Vocational Simulation Suites
         </h3>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%, 240px),1fr));gap:14px;margin-bottom:20px">
-          <div class="c cl" onclick="go('mods')">
+          <div class="c cl" onclick="openMod('elec')">
             <span style="font-size:32px">⚡</span>
             <h4 style="margin:8px 0 4px">Electrical Safety (3D VR)</h4>
             <p class="m" style="margin:0;font-size:12px">480V Industrial switchgear panel, LOTO isolation, zero voltage verification &amp; emergency drill.</p>
@@ -3537,6 +3537,18 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
             <span style="font-size:32px">🔥</span>
             <h4 style="margin:8px 0 4px">Welding Safety (3D VR)</h4>
             <p class="m" style="margin:0;font-size:12px">Hot-work perimeter clearance, fume ventilation, ground clamp &amp; Class B fire extinguisher response.</p>
+          </div>
+
+          <div class="c cl" onclick="openMod('con')">
+            <span style="font-size:32px">🏗️</span>
+            <h4 style="margin:8px 0 4px">Construction Safety (3D VR)</h4>
+            <p class="m" style="margin:0;font-size:12px">Multi-tier scaffolding, green Scafftag, drop-zone barricading, lifeline D-ring anchor &amp; bolt torque fixing.</p>
+          </div>
+
+          <div class="c cl" onclick="openMod('mac')">
+            <span style="font-size:32px">⚙️</span>
+            <h4 style="margin:8px 0 4px">Machine Operation (3D VR)</h4>
+            <p class="m" style="margin:0;font-size:12px">Heavy metal lathe chuck, interlocked polycarbonate guard, palm E-Stop trip test, swarf brush &amp; LOTO switch.</p>
           </div>
 
           <div class="c cl" onclick="go('cadlab')">
@@ -3687,6 +3699,26 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
             <h3 style="margin:8px 0 4px">Industrial Welding Bay</h3>
             <p class="m" style="font-size:13px;margin:0 0 12px">Hot-work perimeter clearance, fume extractor exhaust, grounding clamp attachment, and Class B fire emergency drill.</p>
             <button class="b" onclick="openMod('weld');event.stopPropagation()" style="width:100%;font-size:13px;background:linear-gradient(135deg,#ea580c,#c2410c)">▶ Launch Welding Bay</button>
+          </div>
+
+          <div class="c cl" onclick="openMod('con')" style="border-top:3px solid #eab308;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <span style="font-size:28px">🏗️</span>
+              <span class="tag a" style="background:#ca8a04;color:#fff">3D VR READY</span>
+            </div>
+            <h3 style="margin:8px 0 4px">Construction Safety</h3>
+            <p class="m" style="font-size:13px;margin:0 0 12px">Multi-tier steel scaffolding, green Scafftag, drop-zone barricading, lifeline D-ring anchor, and bolt torque fixing at height.</p>
+            <button class="b" onclick="openMod('con');event.stopPropagation()" style="width:100%;font-size:13px;background:linear-gradient(135deg,#ca8a04,#a16207)">▶ Launch Construction 3D</button>
+          </div>
+
+          <div class="c cl" onclick="openMod('mac')" style="border-top:3px solid #06b6d4;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <span style="font-size:28px">⚙️</span>
+              <span class="tag a" style="background:#0891b2;color:#fff">3D VR READY</span>
+            </div>
+            <h3 style="margin:8px 0 4px">Machine Operation</h3>
+            <p class="m" style="font-size:13px;margin:0 0 12px">Heavy metalworking lathe chuck, interlocked polycarbonate guard, palm E-Stop trip test, swarf brush, and LOTO switch.</p>
+            <button class="b" onclick="openMod('mac');event.stopPropagation()" style="width:100%;font-size:13px;background:linear-gradient(135deg,#0891b2,#0e7490)">▶ Launch Machine 3D</button>
           </div>
 
           <div class="c cl" onclick="go('cadlab')" style="border-top:3px solid #10b981;cursor:pointer">

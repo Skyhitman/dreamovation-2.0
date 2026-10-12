@@ -644,7 +644,7 @@ app.get(['/learner', '/trainee', '/dashboard'], (req, res) => {
 });
 
 // Explicit static file serving for client assets
-app.get(['/platform_extension.js', '/views_extension.js', '/qrcode.bundle.js', '/ar_module.js'], (req, res) => {
+app.get(['/platform_extension.js', '/views_extension.js', '/workshops_extension.js', '/qrcode.bundle.js', '/ar_module.js'], (req, res) => {
   const fileName = path.basename(req.path.split('?')[0]);
   const filePath = path.join(__dirname, fileName);
   if (fs.existsSync(filePath)) {

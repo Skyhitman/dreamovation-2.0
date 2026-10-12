@@ -50,15 +50,16 @@ font[style] { background: transparent !important; box-shadow: none !important; }
 <title>SkillSafe VR</title>
 <style>
 :root{color-scheme:dark;--bg:#070d18;--card:#0f172a;--card-hover:#1e293b;--tx:#f8fafc;--mut:#94a3b8;--ok:#22c55e;--warn:#f59e0b;--crit:#ef4444;--ac:#38bdf8;--bd:#1e293b}
-*{box-sizing:border-box}html,body{height:100%}html{scroll-padding-top:env(safe-area-inset-top,60px)}
-body{margin:0;padding-top:60px!important;background:var(--bg);color:var(--tx);font:14.5px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+*{box-sizing:border-box}html{min-height:100%;height:auto;overflow-y:auto;scroll-padding-top:env(safe-area-inset-top,60px)}
+body{min-height:100vh;height:auto;margin:0;padding-top:60px!important;background:var(--bg);color:var(--tx);font:14.5px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+main#app{min-height:calc(100vh - 60px);width:100%;display:block}
 button.b{background:var(--ac);color:#04121c;border:0;padding:10px 18px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;transition:transform 0.12s ease,box-shadow 0.12s ease;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 button.b:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(56,189,248,0.3)}
 button.b.o{background:none;color:var(--tx);border:1.5px solid var(--bd)}
 button.b.o:hover{border-color:var(--ac);background:rgba(56,189,248,0.08)}
 button.b.bw{background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff}
 button.b:focus-visible{outline:3px solid var(--warn)}
-.w{max-width:1160px;margin:0 auto;padding:22px 18px;box-sizing:border-box}
+.w{max-width:1180px;margin:0 auto;padding:22px 18px 80px 18px;box-sizing:border-box}
 .g{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
 .c{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px;transition:transform .15s,box-shadow .15s}
 .c h3{margin:0 0 6px}
@@ -2333,7 +2334,9 @@ V.qz=()=>{if(!QZ)return V.dash();if(QZ.i>=QZ.q.length){const p=Math.round(QZ.s*1
 function qzA(b,k){const q=QZ.q[QZ.i],ok=q.o[k]==q.a;if(ok)QZ.s++;b.style.borderColor=ok?'var(--ok)':'var(--crit)';say(ok?'Correct':'Not quite. '+q.a);setTimeout(()=>{QZ.i++;go('qz')},900)}
 function copyRep(){const s=cur,t=`SkillSafe VR report — ${S.name} · ${s.mod} · ${s.d}\nOverall ${s.score}% · Safety ${s.safety}% · Procedure ${s.proc}% · Hazard ${s.haz}% · Task ${s.task}% · Time ${s.te}% · Mistakes ${s.mist.length} · Level ${s.level}\n(Simulated assessment, not a certification)`;try{navigator.clipboard.writeText(t).then(()=>alert('Report summary copied'))}catch(e){prompt('Copy:',t)}}
 // ---- Router
-function go(n){
+function go(n, preserveScroll = false){
+  const sameView = (window.curView === n);
+  const prevScrollY = (preserveScroll || sameView) ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
   if(n!='sim'){try{speechSynthesis.cancel()}catch(e){}}
   if(typeof hud !== 'undefined' && hud) try{ hud.last=-9; }catch(e){}
   if(typeof hudW !== 'undefined' && hudW) try{ hudW.last=-9; }catch(e){}
@@ -2351,7 +2354,11 @@ function go(n){
   }
   if(typeof I !== 'undefined' && I[n]) try{ I[n](); }catch(e){ console.warn('Init error for view', n, e); }
   if(typeof updateNavHeader === 'function') try{ updateNavHeader(); }catch(e){}
-  window.scrollTo(0,0);
+  if ((preserveScroll || sameView) && prevScrollY > 0) {
+    window.scrollTo({ top: prevScrollY, behavior: 'instant' });
+  } else if (!preserveScroll && !sameView) {
+    window.scrollTo(0,0);
+  }
 }
 window._realGo = go;
 window.go = go;

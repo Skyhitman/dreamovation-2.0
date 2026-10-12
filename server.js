@@ -746,6 +746,47 @@ app.patch('/api/v1/ai/queue/:id', async (req, res) => {
 
     const updated = updateRes.rows[0];
 
+    // If approved, automatically create a curriculum assignment so all trainees receive it live
+    let createdAsgn = null;
+    if (status === 'approved') {
+      const asgnId = `asgn_ai_${Date.now()}`;
+      const nowStr = new Date().toISOString().slice(0, 10);
+      const dueDate = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+      try {
+        const asgnInsert = await pool.query(`
+          INSERT INTO assignments (
+            id, title, module_id, batch, instructor_name, assigned_date, due_date,
+            time_limit_mins, pass_criteria, max_attempts, mandatory_steps,
+            critical_safety_gate, status, description
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          RETURNING *
+        `, [
+          asgnId,
+          `🤖 [AI Approved] ${updated.title}`,
+          'elec',
+          'Vocational Engineering Batch 2024-25',
+          'Saurav K (Trainer)',
+          nowStr,
+          dueDate,
+          15,
+          85,
+          3,
+          typeof updated.mandatory_steps === 'string' ? updated.mandatory_steps : JSON.stringify(updated.mandatory_steps || ['Inspect work area', 'Wear PPE', 'Execute sequence flawlessly']),
+          true,
+          'in_progress',
+          `Curriculum AI Scenario approved by Trainer. Objective: ${updated.prompt}`
+        ]);
+        createdAsgn = asgnInsert.rows[0];
+        broadcastToAll({
+          type: 'NEW_ASSIGNMENT',
+          assignment: createdAsgn
+        });
+      } catch (asgnErr) {
+        console.warn('Auto-create assignment for AI scenario error:', asgnErr.message);
+      }
+    }
+
     // Log to audit trail
     await pool.query(`
       INSERT INTO audit_logs (timestamp, user_name, action, category, detail)
@@ -761,7 +802,8 @@ app.patch('/api/v1/ai/queue/:id', async (req, res) => {
     // Broadcast to all clients
     broadcastToAll({
       type: 'SCENARIO_STATUS_CHANGED',
-      scenario: updated
+      scenario: updated,
+      assignment: createdAsgn
     });
 
     return res.json(updated);

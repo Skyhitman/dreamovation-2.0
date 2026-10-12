@@ -764,7 +764,7 @@
       console.warn('AI scenario approval sync error:', e);
     }
 
-    if (window.curView === 'trainer') go('trainer');
+    if (window.curView === 'trainer') go('trainer', true);
     if (window.tip) tip(isApproved ? `✅ Scenario approved and published to Curriculum Catalogue.` : `❌ Scenario returned to author for revisions.`);
   };
 
@@ -814,7 +814,7 @@
       console.warn('Competency sign error:', e);
     }
 
-    if (window.curView === 'trainer') go('trainer');
+    if (window.curView === 'trainer') go('trainer', true);
     if (window.tip) tip(`✍️ Competency ${code} verified and digitally signed!`);
   };
 
@@ -860,7 +860,7 @@
       console.warn('Dispatch drill error:', e);
     }
 
-    if (window.curView === 'trainer') go('trainer');
+    if (window.curView === 'trainer') go('trainer', true);
     if (window.tip) tip(`🎯 Remediation drill for "${topic}" dispatched live to ${traineeName}!`);
   };
 
@@ -877,7 +877,7 @@
       if (res.ok) {
         S.assignedWork = (S.assignedWork || []).filter(a => a.id !== asgnId);
         if (window.tip) tip('🗑️ Assignment withdrawn successfully.');
-        if (window.curView === 'trainer') go('trainer');
+        if (window.curView === 'trainer') go('trainer', true);
       }
     } catch(e) {
       console.warn('Delete assignment error:', e);
@@ -1148,6 +1148,23 @@
               policyCheck: q.policy_check,
               reviewerNotes: q.reviewer_notes || ''
             }));
+
+            // Dynamically register approved AI scenarios into MODS procedure engine for all trainees
+            if (typeof MODS !== 'undefined') {
+              S.approvalQueue.filter(q => q.status === 'approved').forEach(q => {
+                const modKey = 'ai_' + q.id.replace(/[^a-zA-Z0-9]/g, '_');
+                if (!MODS[modKey]) {
+                  MODS[modKey] = {
+                    i: '🤖',
+                    n: q.title,
+                    d: `${q.prompt} (Trainer Approved AI Scenario)`,
+                    ppe: ['p1', 'p2', 'p3'],
+                    it: (q.mandatorySteps || []).map((st, i) => [`step_${i}`, '✅', st, 'Verified Action', 'g']),
+                    st: (q.mandatorySteps || []).map((st, i) => [st, [`step_${i}`]])
+                  };
+                }
+              });
+            }
           }
         }
       } catch(e) {
@@ -1236,9 +1253,9 @@
       try { localStorage.setItem('ssvr', JSON.stringify(S)); } catch(e){}
       console.log("[SkillSafe VR] Complete real database synchronization finished.");
 
-      // Refresh view dynamically if currently rendered
+      // Refresh view dynamically if currently rendered without scroll jumping
       if (window.curView && window.go) {
-        window.go(window.curView);
+        window.go(window.curView, true);
       }
     } catch(e) {
       console.log("[SkillSafe VR] Running in offline / local-first state (Backend API standby).");

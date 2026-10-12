@@ -2888,6 +2888,14 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
   };
 
   V.trainer = function() {
+    if ((!S.cohortStats || (S.users || []).filter(u => u.role === 'learner').length < 5) && window.syncWithBackend && !window._trainerSyncing) {
+      window._trainerSyncing = true;
+      setTimeout(() => {
+        window._trainerSyncing = false;
+        window.syncWithBackend();
+      }, 50);
+    }
+
     const allTrainees = (S.users || []).filter(u => u.role === 'learner');
     const queue = S.approvalQueue || [];
     const asgns = S.assignedWork || [];

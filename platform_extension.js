@@ -271,15 +271,18 @@
 
   if (!S.telemetryStream) S.telemetryStream = [];
 
-  // 6. Real Active User Roster (Strictly Real Registered Accounts)
+  // 6. Real Active User Roster (Strictly Real Registered Accounts from PostgreSQL)
   const REAL_DEFAULT_USERS = [
-    { id: 'u_trainer_saurav', name: 'Saurav K', role: 'trainer', batch: 'Electrical & Electronics Engineering', email: 'saurav.k.2024.ece@rajalakshmi.edu.in', status: 'Active' },
-    { id: 'u_admin_sami', name: 'Sami Sauravanu', role: 'admin', batch: 'Institutional Governance', email: 'samisauravanu@gmail.com', status: 'Active' },
-    { id: 'u_def0d29c', name: 'Deepak Kumar', role: 'learner', batch: 'Industrial Electrical & Switchgear Isolation', email: 'deepak.kumar@rajalakshmi.edu.in', status: 'Active' },
-    { id: 'u_83ae42ce', name: 'Saurav Karunakaran', role: 'learner', batch: 'Vocational Engineering Batch 2024-25', email: 'sauravksep29@gmail.com', status: 'Active' }
+    { id: 'u_trainer_saurav', name: 'Saurav K', role: 'trainer', batch: 'Electrical & Electronics Engineering', email: 'saurav.k.2024.ece@rajalakshmi.edu.in', traineeId: 'REC-TR-2024', status: 'Active' },
+    { id: 'u_admin_sami', name: 'Sami Sauravanu', role: 'admin', batch: 'Institutional Governance', email: 'samisauravanu@gmail.com', traineeId: 'ADM-GLOBAL-01', status: 'Active' },
+    { id: 'u_learner_deepak', name: 'Deepak Kumar', role: 'learner', batch: 'Industrial Electrical & Switchgear Isolation', email: 'deepak.kumar@rajalakshmi.edu.in', traineeId: 'REC-VR-2024', total_sessions: 1, avg_safety: 95, avg_score: 94, status: 'Active' },
+    { id: 'u_66ceec00', name: 'EATHISHA FERNANDEZ G S 251901042', role: 'learner', batch: 'Vocational Engineering Batch 2024-25', email: 'eathishafernandez.gs.2025.csecs@rajalakshmi.edu.in', traineeId: 'REC-VR-FE369B', total_sessions: 0, avg_safety: 100, avg_score: 0, status: 'Active' },
+    { id: 'u_b02c1d21', name: 'SanthoshKumar R', role: 'learner', batch: 'Vocational Engineering Batch 2024-25', email: 'santhoshkumar.r.1009@gmail.com', traineeId: 'REC-VR-41D9C6', total_sessions: 0, avg_safety: 100, avg_score: 0, status: 'Active' },
+    { id: 'u_8e42bc80', name: 'Saurav Karunakaran', role: 'learner', batch: 'Vocational Engineering Batch 2024-25', email: 'sauravksep29@gmail.com', traineeId: 'REC-VR-0D0C02', total_sessions: 0, avg_safety: 100, avg_score: 0, status: 'Active' },
+    { id: 'u_6558b5f1', name: 'Sidharth Reddy', role: 'learner', batch: 'Vocational Engineering Batch 2024-25', email: 'sidharthreddy.c.2024.csecs@rajalakshmi.edu.in', traineeId: 'REC-VR-F20612', total_sessions: 0, avg_safety: 100, avg_score: 0, status: 'Active' }
   ];
 
-  if (!S.users || S.users.some(u => u.email?.includes('technical.ac.in') || u.email?.includes('nsdc.gov.in') || u.id === 'u-1')) {
+  if (!S.users || S.users.some(u => u.email?.includes('technical.ac.in') || u.email?.includes('nsdc.gov.in') || u.id === 'u-1') || (S.users.filter(u => u.role === 'learner').length < 5)) {
     S.users = REAL_DEFAULT_USERS;
   }
 

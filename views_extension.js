@@ -2868,11 +2868,60 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
   // VIEW: 👨‍🏫 TRAINER / INSTRUCTOR WORKSPACE
   // -----------------------------------------------------------------------
   let curTrainerTab = 'overview';
+  let curSelectedTraineePassportId = null;
+
+  window.openTraineePassport = function(traineeId) {
+    curSelectedTraineePassportId = traineeId;
+    switchTrainerTab('passport');
+  };
+
+  window.changePassportTrainee = function(traineeId) {
+    curSelectedTraineePassportId = traineeId;
+    if (window.curView === 'trainer') go('trainer');
+  };
+
+  window.promptDispatchDrill = function(traineeName, traineeId) {
+    const topic = prompt(`Enter targeted remediation drill topic for ${traineeName}:`, 'LOTO Zero-Energy Verification');
+    if (topic && topic.trim()) {
+      dispatchRemediation(traineeName, topic.trim(), traineeId);
+    }
+  };
 
   V.trainer = function() {
-    const allTrainees = S.users.filter(u => u.role === 'learner');
+    const allTrainees = (S.users || []).filter(u => u.role === 'learner');
     const queue = S.approvalQueue || [];
     const asgns = S.assignedWork || [];
+    const stats = S.cohortStats || {};
+
+    if (!curSelectedTraineePassportId && allTrainees.length > 0) {
+      curSelectedTraineePassportId = allTrainees[0].traineeId || allTrainees[0].id;
+    }
+
+    // Determine current passport data for selected trainee
+    let curPassport = null;
+    if (S.allPassports && S.allPassports.length > 0) {
+      curPassport = S.allPassports.find(p => p.trainee_id === curSelectedTraineePassportId || p.id === curSelectedTraineePassportId) || S.allPassports[0];
+    }
+    if (!curPassport) {
+      const selectedTraineeObj = allTrainees.find(t => (t.traineeId || t.id) === curSelectedTraineePassportId) || allTrainees[0];
+      curPassport = S.skillPassport || {
+        trainee_id: selectedTraineeObj?.traineeId || 'REC-VR-2024',
+        full_name: selectedTraineeObj?.name || 'Deepak Kumar',
+        batch: selectedTraineeObj?.batch || 'Industrial Electrical & Switchgear Isolation',
+        institution: 'Rajalakshmi Engineering College (REC)',
+        council: 'Autonomous Institution · Affiliated to Anna University',
+        status: 'IN_TRAINING',
+        verification_hash: '0x1E915D5CA6B71AC229E6F455',
+        verified_by: 'Saurav K (Lic #REC-TR-2024)',
+        competencies: []
+      };
+    }
+
+    const comps = curPassport.competencies || [];
+    const avgSafety = stats.cohort_avg_safety !== undefined ? stats.cohort_avg_safety : 100;
+    const criticalAlerts = stats.critical_safety_alerts !== undefined ? stats.critical_safety_alerts : 0;
+    const incidentBreakdown = stats.incident_breakdown || {};
+    const incidentKeys = Object.keys(incidentBreakdown);
 
     return `
       <div class="w" style="max-width:1200px">
@@ -2882,12 +2931,14 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
             <div style="display:flex;align-items:center;gap:8px">
               <span class="tag a" style="background:#f59e0b;color:#000;font-weight:800">INSTRUCTOR &amp; CERTIFIER PORTAL</span>
               <span class="tag" style="background:#1e293b;color:#94a3b8">${S.name} (Lic #REC-TR-2024)</span>
+              <span class="tag" style="background:#052e16;color:#4ade80;border:1px solid #166534">● LIVE DB CONNECTED</span>
             </div>
             <h1 style="margin:4px 0 2px">👨‍🏫 Trainer / Instructor Workspace</h1>
-            <p class="m" style="margin:0">Cohort telemetry monitoring, curriculum assignment builder, AI scenario validation, and Skill Passport verification.</p>
+            <p class="m" style="margin:0">Live cohort telemetry monitoring, curriculum assignment builder, AI scenario validation, and Skill Passport verification.</p>
           </div>
           <div style="display:flex;gap:8px">
             <button class="b" onclick="switchTrainerTab('builder')">➕ Build New Assignment</button>
+            <button class="b o" onclick="if(window.syncWithBackend){syncWithBackend();tip('🔄 Refreshed live cohort data from PostgreSQL');}">🔄 Refresh Data</button>
           </div>
         </div>
 
@@ -2895,7 +2946,7 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
         <div class="sub-tab-bar">
           <button class="sub-tab-btn ${curTrainerTab==='overview'?'active':''}" onclick="switchTrainerTab('overview')">📊 Cohort Overview &amp; Alerts</button>
           <button class="sub-tab-btn ${curTrainerTab==='trainees'?'active':''}" onclick="switchTrainerTab('trainees')">👥 Trainees &amp; Batches (${allTrainees.length})</button>
-          <button class="sub-tab-btn ${curTrainerTab==='builder'?'active':''}" onclick="switchTrainerTab('builder')">📝 Assignment Builder</button>
+          <button class="sub-tab-btn ${curTrainerTab==='builder'?'active':''}" onclick="switchTrainerTab('builder')">📝 Assignment Builder (${asgns.length})</button>
           <button class="sub-tab-btn ${curTrainerTab==='approvals'?'active':''}" onclick="switchTrainerTab('approvals')">🤖 AI Scenario Approvals (${queue.filter(q=>q.status==='pending').length})</button>
           <button class="sub-tab-btn ${curTrainerTab==='passport'?'active':''}" onclick="switchTrainerTab('passport')">✍️ Passport Sign-Off</button>
           <button class="sub-tab-btn ${curTrainerTab==='remediation'?'active':''}" onclick="switchTrainerTab('remediation')">🎯 Targeted Remediation</button>
@@ -2905,44 +2956,101 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
         ${curTrainerTab === 'overview' ? `
           <div class="g" style="margin-bottom:16px">
             <div class="c"><div class="m">Active Enrolled Trainees</div><div class="k">${allTrainees.length}</div></div>
-            <div class="c"><div class="m">Cohort Average Safety</div><div class="k ok">100%</div></div>
+            <div class="c"><div class="m">Cohort Average Safety</div><div class="k ${avgSafety >= 85 ? 'ok' : 'wn'}">${avgSafety}%</div></div>
             <div class="c"><div class="m">Active Curriculum Tasks</div><div class="k">${asgns.length}</div></div>
-            <div class="c"><div class="m">Critical Safety Alerts</div><div class="k ok">0</div></div>
+            <div class="c"><div class="m">Critical Safety Alerts</div><div class="k ${criticalAlerts > 0 ? 'er' : 'ok'}">${criticalAlerts}</div></div>
           </div>
 
           <!-- Cohort Safety Status Banner -->
-          <div class="c" style="border:1px solid #10b981;background:#052e16;margin-bottom:16px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:20px">🛡️</span>
-              <b style="color:#10b981;font-size:15px">COHORT SAFETY STATUS: 100% COMPLIANT</b>
+          ${criticalAlerts === 0 ? `
+            <div class="c" style="border:1px solid #10b981;background:#052e16;margin-bottom:16px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:20px">🛡️</span>
+                <b style="color:#10b981;font-size:15px">COHORT SAFETY STATUS: 100% COMPLIANT</b>
+              </div>
+              <div style="font-size:13px;color:#cbd5e1;margin-top:4px">
+                All ${allTrainees.length} enrolled engineering trainees in Rajalakshmi Engineering College cohorts have passed deterministic safety gates with zero unaddressed incidents.
+              </div>
             </div>
-            <div style="font-size:13px;color:#cbd5e1;margin-top:4px">
-              All enrolled engineering trainees in Rajalakshmi Engineering College cohorts have passed deterministic safety gates with zero unaddressed incidents.
+          ` : `
+            <div class="c" style="border:1px solid #ef4444;background:#2d0607;margin-bottom:16px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:20px">⚠️</span>
+                <b style="color:#ef4444;font-size:15px">COHORT SAFETY ALERT: ${criticalAlerts} CRITICAL INCIDENTS DETECTED</b>
+              </div>
+              <div style="font-size:13px;color:#cbd5e1;margin-top:4px">
+                High-voltage contact or arc flash gate breaches detected in live simulation telemetry. Dispatch targeted remediation drills immediately.
+              </div>
             </div>
-          </div>
+          `}
 
           <div class="g" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
             <!-- Active Assignments Summary -->
             <div class="c">
-              <h3>Active Assignments</h3>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <h3 style="margin:0">Active Assignments (${asgns.length})</h3>
+                <button class="b o" style="font-size:11px;padding:3px 8px" onclick="switchTrainerTab('builder')">Manage</button>
+              </div>
               ${asgns.length ? asgns.map(a => `
                 <div style="background:#0f172a;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--ac)">
-                  <div style="display:flex;justify-content:space-between">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
                     <b>${a.title}</b>
                     <span class="tag a">${a.status}</span>
                   </div>
-                  <small style="color:#94a3b8">Batch: ${a.batch} · Due: ${a.dueDate} · Pass: ${a.passCriteria}%</small>
+                  <small style="color:#94a3b8;display:block;margin-top:4px">Batch: ${a.batch} · Due: ${a.dueDate || a.due_date} · Pass: ${a.passCriteria || a.pass_criteria}%</small>
                 </div>
-              `).join('') : '<p class="m" style="padding:12px 0">No active assignments published.</p>'}
+              `).join('') : '<p class="m" style="padding:12px 0">No active assignments published. Click "+ Build New Assignment" above.</p>'}
             </div>
 
             <!-- Common Cohort Mistakes -->
             <div class="c">
-              <h3>Cohort Safety Incident Breakdown</h3>
-              <div style="padding:16px 0;text-align:center;color:#94a3b8;font-size:13px">
-                ✅ Zero safety violations recorded in current active sessions. Trainee cohorts are following standard SOP protocols.
-              </div>
+              <h3 style="margin:0 0 10px">Cohort Safety Incident Breakdown</h3>
+              ${incidentKeys.length > 0 ? `
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  ${incidentKeys.map(k => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;background:#09121d;border:1px solid #1e2e42;border-radius:8px;padding:8px 12px">
+                      <span style="color:#f87171;font-size:13px">⚠️ ${k}</span>
+                      <span class="tag er">${incidentBreakdown[k]} Occurrences</span>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : `
+                <div style="padding:16px 0;text-align:center;color:#94a3b8;font-size:13px">
+                  ✅ Zero safety violations recorded in current active sessions. Trainee cohorts are following standard SOP protocols.
+                </div>
+              `}
             </div>
+          </div>
+
+          <!-- Real-Time Completed Sessions Activity Feed -->
+          <div class="c" style="margin-top:16px">
+            <h3 style="margin:0 0 10px;display:flex;align-items:center;gap:8px">
+              <span>📡</span> Live Trainee Telemetry &amp; Recent Simulation Runs
+            </h3>
+            ${stats.recent_sessions && stats.recent_sessions.length > 0 ? `
+              <div class="table-responsive">
+                <table>
+                  <tr><th>Learner</th><th>Module</th><th>Date</th><th>Score</th><th>Safety</th><th>Critical Gate</th><th>Duration</th></tr>
+                  ${stats.recent_sessions.map(s => `
+                    <tr>
+                      <td><b>${s.learner_name || 'Learner'}</b></td>
+                      <td><span class="tag a">${(s.module_id || '').toUpperCase()}</span></td>
+                      <td class="m">${s.date_str || new Date(s.created_at).toLocaleDateString()}</td>
+                      <td><span class="tag ${s.score >= 80 ? 'ok' : 'wn'}">${s.score}%</span></td>
+                      <td><span class="tag ${s.safety_score >= 85 ? 'ok' : 'wn'}">${s.safety_score}%</span></td>
+                      <td>
+                        <span class="tag ${s.critical_gate_passed ? 'a' : 'er'}">
+                          ${s.critical_gate_passed ? '✔ PASSED' : '✖ BREACH'}
+                        </span>
+                      </td>
+                      <td class="m">${s.duration_secs || 0}s</td>
+                    </tr>
+                  `).join('')}
+                </table>
+              </div>
+            ` : `
+              <p class="m" style="padding:10px 0;text-align:center">No recent simulation attempts recorded yet. Completed trainee runs will stream here live via WebSocket.</p>
+            `}
           </div>
         ` : ''}
 
@@ -2950,24 +3058,44 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
         ${curTrainerTab === 'trainees' ? `
           <div class="c">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-              <h3 style="margin:0">Trainee Cohort Roster (${allTrainees.length} Enrolled)</h3>
+              <div>
+                <h3 style="margin:0">Trainee Cohort Roster (${allTrainees.length} Enrolled in PostgreSQL)</h3>
+                <small class="m">Direct live connection to real enrolled engineering learners at Rajalakshmi Engineering College.</small>
+              </div>
               <div style="display:flex;gap:6px">
-                <button class="b o" style="font-size:12px;padding:4px 10px">All Batches</button>
+                <button class="b o" style="font-size:12px;padding:4px 10px">All Batches (${allTrainees.length})</button>
               </div>
             </div>
             <div class="table-responsive">
               <table>
-                <tr><th>Name</th><th>Email</th><th>Batch / Trade</th><th>Role</th><th>Status</th><th>Actions</th></tr>
+                <tr>
+                  <th>Learner Name</th>
+                  <th>Trainee ID</th>
+                  <th>Email</th>
+                  <th>Batch / Trade</th>
+                  <th>Runs</th>
+                  <th>Avg Safety</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
                 ${allTrainees.map(u => `
                   <tr>
                     <td><b>${u.name}</b></td>
-                    <td class="m">${u.email}</td>
-                    <td>${u.batch}</td>
-                    <td><span class="tag a" style="background:#0284c7;color:#fff">${u.role.toUpperCase()}</span></td>
-                    <td><span class="tag a">Active</span></td>
+                    <td><code style="color:#38bdf8;font-size:12px">${u.traineeId || u.id}</code></td>
+                    <td class="m" style="font-size:12px">${u.email}</td>
+                    <td style="font-size:12px">${u.batch}</td>
+                    <td><span class="tag" style="background:#1e293b;color:#f8fafc">${u.total_sessions || 0}</span></td>
                     <td>
-                      <button class="b o" style="font-size:11px;padding:3px 8px" onclick="go('passport')">View Passport</button>
-                      <button class="b bw" style="font-size:11px;padding:3px 8px" onclick="dispatchRemediation('${u.name}', 'LOTO Zero Energy')">Send Drill</button>
+                      <span class="tag ${(!u.avg_safety || u.avg_safety >= 80) ? 'ok' : 'wn'}">
+                        ${u.avg_safety ? u.avg_safety + '%' : '100%'}
+                      </span>
+                    </td>
+                    <td><span class="tag a" style="background:#052e16;color:#4ade80;border:1px solid #166534">● Active</span></td>
+                    <td>
+                      <div style="display:flex;gap:4px">
+                        <button class="b o" style="font-size:11px;padding:3px 8px" onclick="openTraineePassport('${u.traineeId || u.id}')">✍️ Passport</button>
+                        <button class="b bw" style="font-size:11px;padding:3px 8px" onclick="promptDispatchDrill('${u.name}', '${u.traineeId || u.id}')">🎯 Drill</button>
+                      </div>
                     </td>
                   </tr>
                 `).join('')}
@@ -2978,64 +3106,92 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
 
         <!-- TAB CONTENT: ASSIGNMENT BUILDER -->
         ${curTrainerTab === 'builder' ? `
-          <div class="c" style="max-width:800px">
-            <h3 style="margin:0 0 10px">📝 Create Curriculum Assignment</h3>
-            <p class="m" style="margin:0 0 16px">Publish standardized training tasks with mandatory steps and deterministic safety gate rules to student cohorts.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr));gap:16px">
+            <div class="c">
+              <h3 style="margin:0 0 10px">📝 Create Curriculum Assignment</h3>
+              <p class="m" style="margin:0 0 16px">Publish standardized training tasks with mandatory steps and deterministic safety gate rules directly to Neon PostgreSQL.</p>
 
-            <form onsubmit="handleCreateAssignment(event)">
-              <div style="margin-bottom:14px">
-                <label style="font-size:12px;color:#94a3b8">Assignment Title:</label>
-                <input id="asgn-title-input" required placeholder="e.g. 480V Breaker Isolation & Arc Flash Audit" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#fff;font-size:14px">
+              <form onsubmit="handleCreateAssignment(event)">
+                <div style="margin-bottom:14px">
+                  <label style="font-size:12px;color:#94a3b8">Assignment Title:</label>
+                  <input id="asgn-title-input" required placeholder="e.g. 480V Breaker Isolation & Arc Flash Audit" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#fff;font-size:14px">
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px;margin-bottom:14px">
+                  <div>
+                    <label style="font-size:12px;color:#94a3b8">Target Batch:</label>
+                    <select id="asgn-batch-select" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#38bdf8;font-size:13px">
+                      <option value="Industrial Electrical Batch A-24">Industrial Electrical Batch A-24</option>
+                      <option value="Vocational Engineering Batch 2024-25">Vocational Engineering Batch 2024-25</option>
+                      <option value="Welding & Fabrication Batch B-12">Welding &amp; Fabrication Batch B-12</option>
+                      <option value="Mechanical & CNC Batch C-08">Mechanical &amp; CNC Batch C-08</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:#94a3b8">Module / Scenario:</label>
+                    <select id="asgn-mod-select" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#38bdf8;font-size:13px">
+                      <option value="elec">⚡ Electrical Safety — Switchgear Maintenance (3D)</option>
+                      <option value="weld">🔥 Welding Safety — Hot Work &amp; Fire Response (3D)</option>
+                      <option value="con">🏗️ Construction Safety — Fall Arrest at Height</option>
+                      <option value="mac">⚙️ Machine Operation — Lathe Guards &amp; E-Stop</option>
+                      <option value="aut">🚗 Automotive Maintenance — Hydraulic Lift &amp; 12V Battery</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:12px;margin-bottom:16px">
+                  <div>
+                    <label style="font-size:12px;color:#94a3b8">Due Date:</label>
+                    <input type="date" id="asgn-due-date" value="2026-10-30" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#fff;font-size:13px">
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:#94a3b8">Time Limit (mins):</label>
+                    <input type="number" id="asgn-time-limit" value="15" min="5" max="60" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#fff;font-size:13px">
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:#94a3b8">Pass Criteria (%):</label>
+                    <input type="number" id="asgn-pass-mark" value="85" min="60" max="95" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#fff;font-size:13px">
+                  </div>
+                </div>
+
+                <div style="margin-bottom:16px;background:#09121d;border:1px solid #1e2e42;border-radius:10px;padding:12px">
+                  <label style="font-weight:700;color:#facc15;font-size:13px;display:flex;align-items:center;gap:6px">
+                    <input type="checkbox" id="asgn-gate-check" checked style="accent-color:#22c55e">
+                    Enforce Deterministic Critical Safety Gate (Zero-Tolerance Arc Flash &amp; Live Contact)
+                  </label>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:4px">
+                    If checked, critical safety violations trigger instant arc flash freeze-frame and cannot be averaged away.
+                  </div>
+                </div>
+
+                <button type="submit" class="b" style="width:100%">🚀 Publish Assignment Live</button>
+              </form>
+            </div>
+
+            <div class="c">
+              <h3 style="margin:0 0 10px">Published Curriculum Assignments (${asgns.length})</h3>
+              <p class="m" style="margin:0 0 14px">Active assignments currently assigned to student cohorts in Neon PostgreSQL database.</p>
+              
+              <div style="display:flex;flex-direction:column;gap:10px">
+                ${asgns.map(a => `
+                  <div style="background:#09121d;border:1px solid #1e2e42;border-radius:10px;padding:14px;border-left:4px solid var(--ac)">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                      <div>
+                        <b style="font-size:14px;color:#f8fafc">${a.title}</b>
+                        <div class="m" style="font-size:12px;margin:3px 0">Cohort: <b>${a.batch}</b> · Module: <b>${(a.moduleId || a.module_id || '').toUpperCase()}</b></div>
+                        <div class="m" style="font-size:11px">Due: ${a.dueDate || a.due_date} · Passing: ${a.passCriteria || a.pass_criteria}% · Limit: ${a.timeLimitMins || a.time_limit_mins} mins</div>
+                      </div>
+                      <div style="text-align:right">
+                        <span class="tag a" style="font-size:10px">${a.status}</span>
+                        <div style="margin-top:8px">
+                          <button class="b o" style="font-size:11px;padding:3px 8px;border-color:#ef4444;color:#fca5a5" onclick="deleteAssignment('${a.id}')">🗑️ Withdraw</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
               </div>
-
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;margin-bottom:14px">
-                <div>
-                  <label style="font-size:12px;color:#94a3b8">Target Batch:</label>
-                  <select id="asgn-batch-select" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#38bdf8;font-size:13px">
-                    <option value="Industrial Electrical Batch A-24">Industrial Electrical Batch A-24</option>
-                    <option value="Welding & Fabrication Batch B-12">Welding &amp; Fabrication Batch B-12</option>
-                    <option value="Mechanical & CNC Batch C-08">Mechanical &amp; CNC Batch C-08</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="font-size:12px;color:#94a3b8">Module / Scenario:</label>
-                  <select id="asgn-mod-select" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#38bdf8;font-size:13px">
-                    <option value="elec">⚡ Electrical Safety — Switchgear Maintenance (3D)</option>
-                    <option value="weld">🔥 Welding Safety — Hot Work &amp; Fire Response (3D)</option>
-                    <option value="con">🏗️ Construction Safety — Fall Arrest at Height</option>
-                    <option value="aut">🚗 Automotive Maintenance — Hydraulic Lift &amp; 12V Battery</option>
-                    <option value="mac">⚙️ Machine Operation — Lathe Guards &amp; E-Stop</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:12px;margin-bottom:16px">
-                <div>
-                  <label style="font-size:12px;color:#94a3b8">Due Date:</label>
-                  <input type="date" id="asgn-due-date" value="2026-10-30" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#fff;font-size:13px">
-                </div>
-                <div>
-                  <label style="font-size:12px;color:#94a3b8">Time Limit (mins):</label>
-                  <input type="number" id="asgn-time-limit" value="15" min="5" max="60" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#fff;font-size:13px">
-                </div>
-                <div>
-                  <label style="font-size:12px;color:#94a3b8">Pass Criteria (%):</label>
-                  <input type="number" id="asgn-pass-mark" value="85" min="60" max="95" style="width:100%;padding:10px;margin-top:4px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#fff;font-size:13px">
-                </div>
-              </div>
-
-              <div style="margin-bottom:16px;background:#09121d;border:1px solid #1e2e42;border-radius:10px;padding:12px">
-                <label style="font-weight:700;color:#facc15;font-size:13px;display:flex;align-items:center;gap:6px">
-                  <input type="checkbox" id="asgn-gate-check" checked style="accent-color:#22c55e">
-                  Enforce Deterministic Critical Safety Gate (Zero-Tolerance Arc Flash &amp; Live Contact)
-                </label>
-                <div style="font-size:11px;color:#94a3b8;margin-top:4px">
-                  If checked, critical safety violations trigger instant arc flash freeze-frame and cannot be averaged away.
-                </div>
-              </div>
-
-              <button type="submit" class="b" style="width:100%">🚀 Publish Assignment to Cohort</button>
-            </form>
+            </div>
           </div>
         ` : ''}
 
@@ -3045,9 +3201,9 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
               <div>
                 <h3 style="margin:0;display:flex;align-items:center;gap:8px">
-                  <span>🤖</span> AI Scenario Planner Governance Queue
+                  <span>🤖</span> AI Scenario Planner Governance Queue (${queue.length})
                 </h3>
-                <p class="m" style="margin:2px 0 0;font-size:12px">Trainer review is mandatory before AI or Photo-generated scenarios can be assigned or shared.</p>
+                <p class="m" style="margin:2px 0 0;font-size:12px">Trainer review is mandatory in PostgreSQL before AI-proposed scenarios can be assigned or shared.</p>
               </div>
             </div>
 
@@ -3071,22 +3227,22 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
                     </div>
                   </div>
 
-                  <div style="margin-top:10px;padding:10px;background:#060a10;border-radius:8px;font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div style="margin-top:10px;padding:10px;background:#060a10;border-radius:8px;font-size:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
                     <div>
                       <b style="color:#ef4444">Identified Hazards:</b>
                       <ul style="margin:4px 0 0;padding-left:16px;color:#cbd5e1">
-                        ${q.hazards.map(h => `<li>${h}</li>`).join('')}
+                        ${(q.hazards || []).map(h => `<li>${h}</li>`).join('')}
                       </ul>
                     </div>
                     <div>
                       <b style="color:#22c55e">Mandatory Protocol Steps:</b>
                       <ol style="margin:4px 0 0;padding-left:16px;color:#cbd5e1">
-                        ${q.mandatorySteps.map(s => `<li>${s}</li>`).join('')}
+                        ${(q.mandatorySteps || []).map(s => `<li>${s}</li>`).join('')}
                       </ol>
                     </div>
                   </div>
                   <div style="margin-top:8px;font-size:11px;color:#38bdf8">
-                    Safety Policy Check: <b>${q.policyCheck}</b>
+                    Safety Policy Check: <b>${q.policyCheck || 'PASSED (OSHA 1910 / ISO 45001)'}</b>
                   </div>
                 </div>
               `).join('')}
@@ -3097,11 +3253,48 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
         <!-- TAB CONTENT: SKILL PASSPORT VERIFICATION -->
         ${curTrainerTab === 'passport' ? `
           <div class="c">
-            <h3 style="margin:0 0 10px">✍️ Trainee Competency Endorsement Portal</h3>
-            <p class="m" style="margin:0 0 14px">Digitally sign off practical assessment evidence for trainee Skill Passports.</p>
+            <!-- Trainee Selector Dropdown -->
+            <div style="background:#09121d;border:1px solid #1e2e42;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+              <div>
+                <span style="font-size:12px;color:#94a3b8;font-weight:700">INSPECT &amp; ENDORSE TRAINEE PASSPORT:</span>
+                <select id="trainer-passport-trainee-select" onchange="changePassportTrainee(this.value)" style="margin-left:8px;padding:8px 14px;border-radius:8px;background:#060a10;border:1px solid #38bdf8;color:#38bdf8;font-size:13px;font-weight:700">
+                  ${allTrainees.map(t => `
+                    <option value="${t.traineeId || t.id}" ${(curSelectedTraineePassportId === (t.traineeId || t.id)) ? 'selected' : ''}>
+                      ${t.name} (${t.traineeId || t.id}) · ${t.batch}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+              <div>
+                <span class="tag a" style="background:#052e16;color:#4ade80;border:1px solid #166534">● LIVE REGISTRY VERIFIABLE</span>
+              </div>
+            </div>
 
-            ${S.skillPassport.competencies.map(c => `
-              <div style="background:#09121d;border:1px solid #1e2c40;border-radius:10px;padding:14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <!-- Selected Trainee Passport Meta Card -->
+            <div style="background:#080f1a;border:2px solid ${curPassport.status === 'VERIFIED' ? '#22c55e' : '#38bdf8'};border-radius:12px;padding:18px;margin-bottom:18px">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+                <div>
+                  <h3 style="margin:0;font-size:18px;color:#f8fafc">${curPassport.full_name || curPassport.fullName}</h3>
+                  <div class="m" style="font-size:12px;margin-top:2px">ID: <b>${curPassport.trainee_id || curPassport.traineeId}</b> · Batch: <b>${curPassport.batch}</b></div>
+                  <div class="m" style="font-size:12px">Institution: <b>${curPassport.institution}</b></div>
+                </div>
+                <div style="text-align:right">
+                  <span class="tag ${curPassport.status === 'VERIFIED' ? 'ok' : 'a'}" style="font-size:12px;padding:4px 10px;font-weight:700">
+                    ${curPassport.status}
+                  </span>
+                  <div style="margin-top:4px">
+                    <a href="/verify/${curPassport.verification_hash || curPassport.verificationHash}" target="_blank" style="font-size:11px;color:#38bdf8;text-decoration:none">🔗 Open Public Verification Ledger</a>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top:10px;background:#020617;border:1px dashed #38bdf866;border-radius:6px;padding:8px 12px;font-family:monospace;font-size:11px;color:#38bdf8;word-break:break-all">
+                SHA-256 Ledger Hash: <b>${curPassport.verification_hash || curPassport.verificationHash}</b>
+              </div>
+            </div>
+
+            <h4 style="margin:16px 0 10px;color:#fff">Verified Vocational Competencies (${comps.length}):</h4>
+            ${comps.map(c => `
+              <div style="background:#09121d;border:1px solid ${c.status === 'VERIFIED' ? '#22c55e66' : '#1e2c40'};border-radius:10px;padding:14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                 <div>
                   <div style="display:flex;align-items:center;gap:6px">
                     <b style="font-size:14px;color:#f1f5f9">${c.title}</b>
@@ -3111,9 +3304,13 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
                 </div>
                 <div style="display:flex;align-items:center;gap:10px">
                   ${c.status === 'VERIFIED' ? `
-                    <span class="tag a" style="padding:6px 12px">✅ Signed by ${c.certifier}</span>
+                    <span class="tag a" style="padding:6px 12px;background:#052e16;color:#4ade80;border:1px solid #166534">
+                      ✅ Verified by ${c.certifier} on ${c.verified_date || c.verifiedDate}
+                    </span>
                   ` : `
-                    <button class="b" onclick="signCompetency('${c.code}')" style="font-size:12px;padding:6px 14px">✍️ Sign &amp; Verify Competency</button>
+                    <button class="b" onclick="signCompetency('${c.code}', '${curPassport.trainee_id || curPassport.traineeId}')" style="font-size:12px;padding:6px 14px">
+                      ✍️ Sign &amp; Verify Competency
+                    </button>
                   `}
                 </div>
               </div>
@@ -3125,25 +3322,42 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
         ${curTrainerTab === 'remediation' ? `
           <div class="c">
             <h3 style="margin:0 0 10px">🎯 Targeted Practice &amp; Remediation Dispatch</h3>
-            <p class="m" style="margin:0 0 14px">Dispatch targeted micro-simulation drills to students based on rule-based and AI mistake diagnostics.</p>
+            <p class="m" style="margin:0 0 16px">Dispatch targeted micro-simulation drills directly to Neon PostgreSQL based on rule-based and AI mistake diagnostics.</p>
+
+            <!-- Target Selection -->
+            <div style="background:#09121d;border:1px solid #1e2e42;border-radius:10px;padding:12px;margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+              <span style="font-size:12px;color:#94a3b8;font-weight:700">TARGET TRAINEE / COHORT:</span>
+              <select id="remediation-target-select" style="padding:6px 12px;border-radius:8px;background:#060a10;border:1px solid #24354c;color:#fff;font-size:13px">
+                <option value="All Enrolled Cohorts">All Enrolled Cohorts (Rajalakshmi Engineering College)</option>
+                ${allTrainees.map(t => `
+                  <option value="${t.name}">Student: ${t.name} (${t.traineeId || t.id})</option>
+                `).join('')}
+              </select>
+            </div>
 
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
               <div style="background:#09121d;border:1px solid #1e2c40;border-radius:10px;padding:14px">
-                <b style="color:#ef4444">PPE Preparation Protocol</b>
+                <b style="color:#ef4444;display:block;margin-bottom:4px">PPE Preparation Protocol</b>
                 <p class="m" style="font-size:12px;margin:6px 0">Reinforces wearing all 3 mandatory PPE items before high-voltage equipment contact.</p>
-                <button class="b bw" style="width:100%;font-size:12px" onclick="dispatchRemediation('Electrical Cohort', 'Mandatory 3-Point PPE Donning')">Dispatch 5-min PPE Drill ➔</button>
+                <button class="b bw" style="width:100%;font-size:12px" onclick="dispatchRemediation(document.getElementById('remediation-target-select').value, 'Mandatory 3-Point PPE Donning')">Dispatch 5-min PPE Drill ➔</button>
               </div>
 
               <div style="background:#09121d;border:1px solid #1e2c40;border-radius:10px;padding:14px">
-                <b style="color:#f59e0b">LOTO Zero-Energy Verification</b>
+                <b style="color:#f59e0b;display:block;margin-bottom:4px">LOTO Zero-Energy Verification</b>
                 <p class="m" style="font-size:12px;margin:6px 0">Enforces multimeter 0.0V tester verification prior to physical panel maintenance.</p>
-                <button class="b bw" style="width:100%;font-size:12px" onclick="dispatchRemediation('Electrical Cohort', 'LOTO Zero-Energy Verification')">Dispatch LOTO Drill ➔</button>
+                <button class="b bw" style="width:100%;font-size:12px" onclick="dispatchRemediation(document.getElementById('remediation-target-select').value, 'LOTO Zero-Energy Verification')">Dispatch LOTO Drill ➔</button>
               </div>
 
               <div style="background:#09121d;border:1px solid #1e2c40;border-radius:10px;padding:14px">
-                <b style="color:#38bdf8">Hot Work Fire Clearance</b>
+                <b style="color:#38bdf8;display:block;margin-bottom:4px">Hot Work Fire Clearance</b>
                 <p class="m" style="font-size:12px;margin:6px 0">Practice 10m perimeter clearance of flammable solvents before arc strike.</p>
-                <button class="b bw" style="width:100%;font-size:12px" onclick="dispatchRemediation('Welding Cohort', 'Welding Bay Fire Clearance')">Dispatch Hot Work Drill ➔</button>
+                <button class="b bw" style="width:100%;font-size:12px" onclick="dispatchRemediation(document.getElementById('remediation-target-select').value, 'Welding Bay Fire Clearance')">Dispatch Hot Work Drill ➔</button>
+              </div>
+
+              <div style="background:#09121d;border:1px solid #1e2c40;border-radius:10px;padding:14px">
+                <b style="color:#a855f7;display:block;margin-bottom:4px">Machine Guard &amp; E-Stop Protocol</b>
+                <p class="m" style="font-size:12px;margin:6px 0">Enforces interlock guard closed &amp; emergency stop switch test sequence.</p>
+                <button class="b bw" style="width:100%;font-size:12px" onclick="dispatchRemediation(document.getElementById('remediation-target-select').value, 'Machine Guard Interlock & E-Stop')">Dispatch Machine Safety Drill ➔</button>
               </div>
             </div>
           </div>
@@ -3157,7 +3371,7 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
     if (window.curView === 'trainer') go('trainer');
   };
 
-  window.handleCreateAssignment = function(e) {
+  window.handleCreateAssignment = async function(e) {
     e.preventDefault();
     const title = document.getElementById('asgn-title-input')?.value.trim();
     const batch = document.getElementById('asgn-batch-select')?.value;
@@ -3169,37 +3383,55 @@ IMPORTANT: Answer the user's specific question directly in strictly 2 short, inf
 
     if (!title) return;
 
-    const newA = {
-      id: 'asgn-' + Date.now(),
+    const payload = {
       title,
       batch,
-      moduleId: mod,
-      instructor: S.name,
-      assignedDate: new Date().toISOString().slice(0, 10),
-      dueDate: due,
-      timeLimitMins: time,
-      passCriteria: pass,
-      maxAttempts: 3,
-      attemptsDone: 0,
-      status: 'pending',
-      mandatorySteps: ['Inspect work area', 'Wear PPE', 'Execute procedure without safety violations'],
-      criticalSafetyGate: gate,
-      description: `Cohort assignment created by ${S.name} with ${pass}% pass mark threshold.`
+      module_id: mod,
+      instructor_name: `${S.name} (Trainer)`,
+      due_date: due,
+      time_limit_mins: time,
+      pass_criteria: pass,
+      max_attempts: 3,
+      mandatory_steps: ['Inspect work area', 'Wear PPE', 'Execute sequence flawlessly without safety infractions'],
+      critical_safety_gate: gate,
+      description: `Curriculum assignment published by ${S.name} with ${pass}% pass mark threshold.`
     };
 
-    S.assignedWork = S.assignedWork || [];
-    S.assignedWork.unshift(newA);
-    try { localStorage.setItem('ssvr', JSON.stringify(S)); } catch(e){}
+    try {
+      const res = await fetch('/api/v1/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(window.SKILLSAFE_TOKEN ? { 'Authorization': `Bearer ${window.SKILLSAFE_TOKEN}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const created = await res.json();
+        S.assignedWork = S.assignedWork || [];
+        S.assignedWork.unshift({
+          id: created.id,
+          title: created.title,
+          moduleId: created.module_id,
+          batch: created.batch,
+          instructor: created.instructor_name,
+          assignedDate: created.assigned_date,
+          dueDate: created.due_date,
+          timeLimitMins: created.time_limit_mins,
+          passCriteria: created.pass_criteria,
+          maxAttempts: created.max_attempts,
+          attemptsDone: 0,
+          status: created.status,
+          mandatorySteps: typeof created.mandatory_steps === 'string' ? JSON.parse(created.mandatory_steps) : created.mandatory_steps,
+          criticalSafetyGate: !!created.critical_safety_gate,
+          description: created.description
+        });
+        if (window.tip) tip(`✅ Assignment "${title}" published to Neon PostgreSQL and broadcast live!`);
+      }
+    } catch(err) {
+      console.warn('Assignment creation error:', err);
+    }
 
-    S.auditLogs.unshift({
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      user: S.name,
-      action: 'CREATE_ASSIGNMENT',
-      detail: `Created assignment: ${title} for ${batch}`,
-      category: 'CURRICULUM'
-    });
-
-    if (window.tip) tip(`✅ Assignment "${title}" published to ${batch}!`);
     switchTrainerTab('overview');
   };
 

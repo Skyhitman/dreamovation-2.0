@@ -2829,7 +2829,46 @@ function commit(s){const em=s.em;
  s.score=cl(.3*s.safety+.25*s.proc+.15*s.haz+.2*s.task+.1*s.te);s.level=lvl(s.score);
  s.nb=[];const add=b=>{if(!S.badges.includes(b)){S.badges.push(b);s.nb.push(b)}};if(!s.mist.length)add('Safety First');if(s.haz==100)add('Hazard Hunter');if(s.proc>=90)add('Procedure Master');if(em!=null&&em>=85)add('Quick Responder');if(s.te>=95)add('Speed Runner');if(s.hints===0&&s.score>=85)add('No Hints Needed');
  s.xpg=s.score*3+(s.mist.length?0:50)+(s.lk?25:0);S.xp+=s.xpg;const td=new Date().toDateString();if(S.last!=td){S.streak=S.last==new Date(Date.now()-864e5).toDateString()?S.streak+1:1;S.last=td}
- S.hist.push(s);save();cur=s;go('rep')}
+ S.hist.push(s);save();cur=s;
+
+ // Real-time backend database persistence (Neon PostgreSQL) & Trainer broadcast
+ try {
+   const token = localStorage.getItem('skillsafe_token');
+   const user = JSON.parse(localStorage.getItem('skillsafe_user') || '{}');
+   const modId = MOD=='w'?'weld':(MOD=='c'?'con':(MOD=='m'?'mac':'elec'));
+   const sessionPayload = {
+     learner_id: user.id || user.trainee_id || S.traineeId || 'u_anonymous',
+     module_id: modId,
+     assignment_id: s.assignmentId || null,
+     date_str: new Date().toLocaleDateString(),
+     score: s.score,
+     safety_score: s.safety,
+     procedure_score: s.proc,
+     hazard_score: s.haz,
+     task_completion: s.task,
+     time_efficiency: s.te,
+     duration_secs: s.time,
+     mistakes: s.mist || [],
+     critical_gate_passed: !(s.mist || []).some(m => m === 'arc' || m === 'shock' || m === 'fall' || m === 'fire' || m === 'crush' || m === 'pinch'),
+     telemetry_events: window._currentSessionTelemetry || []
+   };
+   fetch('/api/v1/sessions', {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+     },
+     body: JSON.stringify(sessionPayload)
+   }).then(r => r.json()).then(data => {
+     console.log('[SkillSafe VR] Live session saved to Neon PostgreSQL:', data);
+   }).catch(err => {
+     console.warn('[SkillSafe VR] Session save warning:', err.message);
+   });
+ } catch(e) {
+   console.warn('[SkillSafe VR] Session sync catch:', e.message);
+ }
+
+ go('rep')}
 function startSim(){go('sim');st={haz:new Set,pick:new Set,worn:0,ident:0,iso:0,ver:0,tool:0,maint:0,insp:0,rest:0,mist:[],t0:Date.now(),phase:'basic',inZone:0,em:null,hints:0};
  const cv=$('#cv'),sw=$('#sw');
  if(sw&&!document.getElementById('telemetry-contract-hud')){

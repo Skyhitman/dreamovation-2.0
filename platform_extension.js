@@ -725,89 +725,160 @@
     }
   };
 
-  // Trainer approves AI scenario
-  window.approveScenario = function(scenId, isApproved) {
-    const s = (S.approvalQueue || []).find(x => x.id === scenId);
-    if (!s) return;
-    s.status = isApproved ? 'approved' : 'rejected';
-    s.reviewerNotes = isApproved ? `Approved by ${S.name} on ${new Date().toLocaleDateString()}` : 'Rejected for safety policy revisions.';
+  // Trainer approves AI scenario (Neon PostgreSQL API)
+  window.approveScenario = async function(scenId, isApproved) {
+    const status = isApproved ? 'approved' : 'rejected';
+    const notes = isApproved ? `Approved by ${S.name} on ${new Date().toLocaleDateString()}` : 'Rejected for safety policy revisions.';
     
-    // If approved, add to training catalogue
-    if (isApproved && !MODS[scenId]) {
-      MODS[scenId] = {
-        i: '⚡',
-        n: s.title,
-        d: s.prompt + ' (AI Generated Scenario)',
-        ppe: ['p1', 'p2', 'p3'],
-        it: s.mandatorySteps.map((st, i) => [`step_${i}`, '✅', st, 'Verified Action', 'g']),
-        st: s.mandatorySteps.map((st, i) => [st, [`step_${i}`]])
-      };
+    try {
+      const res = await fetch(`/api/v1/ai/queue/${scenId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(window.SKILLSAFE_TOKEN ? { 'Authorization': `Bearer ${window.SKILLSAFE_TOKEN}` } : {})
+        },
+        body: JSON.stringify({ status, reviewer_notes: notes })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        const s = (S.approvalQueue || []).find(x => x.id === scenId);
+        if (s) {
+          s.status = updated.status;
+          s.reviewerNotes = updated.reviewer_notes;
+        }
+        if (isApproved && !MODS[scenId]) {
+          MODS[scenId] = {
+            i: '⚡',
+            n: updated.title,
+            d: updated.prompt + ' (AI Generated Scenario)',
+            ppe: ['p1', 'p2', 'p3'],
+            it: (updated.mandatory_steps || []).map((st, i) => [`step_${i}`, '✅', st, 'Verified Action', 'g']),
+            st: (updated.mandatory_steps || []).map((st, i) => [st, [`step_${i}`]])
+          };
+        }
+      }
+    } catch(e) {
+      console.warn('AI scenario approval sync error:', e);
     }
 
-    S.auditLogs.unshift({
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      user: S.name,
-      action: isApproved ? 'APPROVE_SCENARIO' : 'REJECT_SCENARIO',
-      detail: `${isApproved ? 'Approved' : 'Rejected'} scenario #${scenId}: ${s.title}`,
-      category: 'GOVERNANCE'
-    });
-
-    try { localStorage.setItem('ssvr', JSON.stringify(S)); } catch(e){}
     if (window.curView === 'trainer') go('trainer');
     if (window.tip) tip(isApproved ? `✅ Scenario approved and published to Curriculum Catalogue.` : `❌ Scenario returned to author for revisions.`);
   };
 
-  // Trainer signs trainee competency
-  window.signCompetency = function(code) {
-    const comp = S.skillPassport.competencies.find(c => c.code === code);
-    if (!comp) return;
-    comp.status = 'VERIFIED';
-    comp.verifiedDate = new Date().toISOString().slice(0, 10);
-    comp.certifier = S.name;
+  // Trainer signs trainee competency (Neon PostgreSQL API)
+  window.signCompetency = async function(code, traineeId) {
+    const targetTid = traineeId || (S.allPassports && S.allPassports[0] ? S.allPassports[0].trainee_id : S.traineeId);
+    try {
+      const res = await fetch('/api/v1/passports/endorse', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(window.SKILLSAFE_TOKEN ? { 'Authorization': `Bearer ${window.SKILLSAFE_TOKEN}` } : {})
+        },
+        body: JSON.stringify({
+          trainee_id: targetTid,
+          competency_code: code,
+          certifier_name: `${S.name} (Lic #REC-TR-2024)`
+        })
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (S.allPassports) {
+          const pass = S.allPassports.find(p => p.trainee_id === targetTid || p.id === targetTid);
+          if (pass) {
+            pass.verification_hash = result.verification_hash;
+            pass.status = result.passport_status;
+            const c = (pass.competencies || []).find(comp => comp.code === code);
+            if (c) {
+              c.status = 'VERIFIED';
+              c.verified_date = new Date().toISOString().slice(0, 10);
+              c.certifier = `${S.name} (Lic #REC-TR-2024)`;
+            }
+          }
+        }
+        if (S.skillPassport && (S.skillPassport.traineeId === targetTid || S.traineeId === targetTid)) {
+          S.skillPassport.verificationHash = result.verification_hash;
+          S.skillPassport.status = result.passport_status;
+          const c = (S.skillPassport.competencies || []).find(comp => comp.code === code);
+          if (c) {
+            c.status = 'VERIFIED';
+            c.verifiedDate = new Date().toISOString().slice(0, 10);
+            c.certifier = `${S.name} (Lic #REC-TR-2024)`;
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('Competency sign error:', e);
+    }
 
-    S.auditLogs.unshift({
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      user: S.name,
-      action: 'ENDORSE_COMPETENCY',
-      detail: `Endorsed competency ${code} (${comp.title}) for Saurav K.`,
-      category: 'CREDENTIAL'
-    });
-
-    try { localStorage.setItem('ssvr', JSON.stringify(S)); } catch(e){}
     if (window.curView === 'trainer') go('trainer');
     if (window.tip) tip(`✍️ Competency ${code} verified and digitally signed!`);
   };
 
-  // Dispatch Targeted Remediation Drill
-  window.dispatchRemediation = function(traineeName, topic) {
-    S.auditLogs.unshift({
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      user: S.name,
-      action: 'DISPATCH_REMEDIATION',
-      detail: `Assigned targeted drill (${topic}) to ${traineeName}`,
-      category: 'REMEDIATION'
-    });
+  // Dispatch Targeted Remediation Drill (Neon PostgreSQL API)
+  window.dispatchRemediation = async function(traineeName, topic, targetTraineeId) {
+    try {
+      const res = await fetch('/api/v1/trainer/dispatch-drill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(window.SKILLSAFE_TOKEN ? { 'Authorization': `Bearer ${window.SKILLSAFE_TOKEN}` } : {})
+        },
+        body: JSON.stringify({
+          trainee_name: traineeName,
+          trainee_id: targetTraineeId || null,
+          topic: topic,
+          module_id: 'elec',
+          due_days: 3
+        })
+      });
+      if (res.ok) {
+        const newDrill = await res.json();
+        S.assignedWork = S.assignedWork || [];
+        S.assignedWork.unshift({
+          id: newDrill.id,
+          title: newDrill.title,
+          moduleId: newDrill.module_id,
+          batch: newDrill.batch,
+          instructor: newDrill.instructor_name,
+          assignedDate: newDrill.assigned_date,
+          dueDate: newDrill.due_date,
+          timeLimitMins: newDrill.time_limit_mins,
+          passCriteria: newDrill.pass_criteria,
+          maxAttempts: newDrill.max_attempts,
+          attemptsDone: 0,
+          status: newDrill.status,
+          mandatorySteps: typeof newDrill.mandatory_steps === 'string' ? JSON.parse(newDrill.mandatory_steps) : newDrill.mandatory_steps,
+          criticalSafetyGate: !!newDrill.critical_safety_gate,
+          description: newDrill.description
+        });
+      }
+    } catch(e) {
+      console.warn('Dispatch drill error:', e);
+    }
 
-    const newAsgn = {
-      id: 'asgn-rem-' + Date.now(),
-      title: `Remediation Drill: ${topic}`,
-      moduleId: 'elec',
-      batch: 'Targeted Remediation',
-      instructor: S.name,
-      assignedDate: new Date().toISOString().slice(0, 10),
-      dueDate: new Date(Date.now() + 864e5 * 3).toISOString().slice(0, 10),
-      timeLimitMins: 10,
-      passCriteria: 90,
-      maxAttempts: 3,
-      attemptsDone: 0,
-      status: 'pending',
-      mandatorySteps: ['Review isolation protocol', 'Wear all PPE', 'Execute sequence flawlessly'],
-      criticalSafetyGate: true,
-      description: `Targeted remediation drill dispatched to address repeated mistakes in ${topic}.`
-    };
-    S.assignedWork.unshift(newAsgn);
-    try { localStorage.setItem('ssvr', JSON.stringify(S)); } catch(e){}
-    if (window.tip) tip(`🎯 Remediation drill for "${topic}" dispatched to ${traineeName}.`);
+    if (window.curView === 'trainer') go('trainer');
+    if (window.tip) tip(`🎯 Remediation drill for "${topic}" dispatched live to ${traineeName}!`);
+  };
+
+  // Delete Assignment (Neon PostgreSQL API)
+  window.deleteAssignment = async function(asgnId) {
+    if (!confirm('Are you sure you want to withdraw and remove this assignment from the curriculum?')) return;
+    try {
+      const res = await fetch(`/api/v1/assignments/${asgnId}`, {
+        method: 'DELETE',
+        headers: {
+          ...(window.SKILLSAFE_TOKEN ? { 'Authorization': `Bearer ${window.SKILLSAFE_TOKEN}` } : {})
+        }
+      });
+      if (res.ok) {
+        S.assignedWork = (S.assignedWork || []).filter(a => a.id !== asgnId);
+        if (window.tip) tip('🗑️ Assignment withdrawn successfully.');
+        if (window.curView === 'trainer') go('trainer');
+      }
+    } catch(e) {
+      console.warn('Delete assignment error:', e);
+    }
   };
 
   // -----------------------------------------------------------------------
@@ -836,6 +907,41 @@
           const msg = JSON.parse(event.data);
           if (msg.type === 'LIVE_TELEMETRY' && (S.role === 'trainer' || S.role === 'admin')) {
             showInstructorTelemetryToast(msg.event);
+          } else if (msg.type === 'SESSION_COMPLETED') {
+            if (S.role === 'trainer' || S.role === 'admin') {
+              const traineeName = msg.trainee?.name || 'Enrolled Trainee';
+              const mod = (msg.session?.module_id || 'sim').toUpperCase();
+              const score = msg.session?.score || 0;
+              const gate = msg.session?.critical_gate_passed ? 'PASSED' : 'VIOLATION';
+              if (window.tip) window.tip(`⚡ [LIVE TELEMETRY] ${traineeName} completed ${mod}! Score: ${score}% · Gate: ${gate}`);
+              if (window.AudioFX) { try { window.AudioFX.playSuccess(); } catch(e){} }
+            }
+            syncWithBackend();
+          } else if (msg.type === 'NEW_ASSIGNMENT') {
+            if (S.role === 'learner' && window.tip) {
+              window.tip(`📋 New Curriculum Assignment: "${msg.assignment?.title}" published!`);
+              if (window.AudioFX) { try { window.AudioFX.playClick(); } catch(e){} }
+            }
+            syncWithBackend();
+          } else if (msg.type === 'DRILL_DISPATCHED') {
+            if (S.role === 'learner') {
+              const targetTid = msg.trainee_id;
+              if (!targetTid || targetTid === S.traineeId || targetTid === AUTH_USER.id) {
+                if (window.tip) window.tip(`🎯 Targeted Drill Assigned: "${msg.drill?.title}"!`);
+                if (window.AudioFX) { try { window.AudioFX.playAlert(); } catch(e){} }
+              }
+            }
+            syncWithBackend();
+          } else if (msg.type === 'COMPETENCY_ENDORSED') {
+            if (S.role === 'learner' && (msg.trainee_id === S.traineeId || msg.trainee_id === AUTH_USER.id || msg.trainee_id === AUTH_USER.trainee_id)) {
+              if (window.tip) window.tip(`✍️ Your Competency [${msg.competency_code}] was verified and digitally signed by ${msg.certifier}!`);
+              if (window.AudioFX) { try { window.AudioFX.playSuccess(); } catch(e){} }
+            }
+            syncWithBackend();
+          } else if (msg.type === 'SCENARIO_STATUS_CHANGED') {
+            syncWithBackend();
+          } else if (msg.type === 'ASSIGNMENT_DELETED') {
+            syncWithBackend();
           }
         } catch(e){}
       };
@@ -925,7 +1031,7 @@
       try {
         const resUsers = await fetch(`${apiUrl}/auth/users`, { 
           headers: authHeaders, 
-          signal: AbortSignal.timeout(2500) 
+          signal: AbortSignal.timeout(3000) 
         });
         if (resUsers.ok) {
           const backendUsers = await resUsers.json();
@@ -937,6 +1043,11 @@
               batch: u.batch,
               email: u.email,
               traineeId: u.trainee_id,
+              total_sessions: u.total_sessions || 0,
+              avg_safety: u.avg_safety,
+              avg_score: u.avg_score,
+              last_active: u.last_active,
+              critical_violations: u.critical_violations,
               status: 'Active'
             }));
           }
@@ -945,11 +1056,24 @@
         console.warn("[SkillSafe VR] Users sync skipped:", e.message);
       }
 
-      // 2. Fetch Real Audit Logs from Backend
+      // 2. Fetch Trainer Cohort Stats
+      try {
+        const resStats = await fetch(`${apiUrl}/trainer/cohort-stats`, {
+          headers: authHeaders,
+          signal: AbortSignal.timeout(3000)
+        });
+        if (resStats.ok) {
+          S.cohortStats = await resStats.json();
+        }
+      } catch(e) {
+        console.warn("[SkillSafe VR] Cohort stats sync skipped:", e.message);
+      }
+
+      // 3. Fetch Real Audit Logs from Backend
       try {
         const resLogs = await fetch(`${apiUrl}/audit/logs`, { 
           headers: authHeaders, 
-          signal: AbortSignal.timeout(2500) 
+          signal: AbortSignal.timeout(3000) 
         });
         if (resLogs.ok) {
           const backendLogs = await resLogs.json();
@@ -968,11 +1092,11 @@
         console.warn("[SkillSafe VR] Audit logs sync skipped:", e.message);
       }
 
-      // 3. Fetch Real Assignments
+      // 4. Fetch Real Assignments
       try {
         const resAsgn = await fetch(`${apiUrl}/assignments`, { 
           headers: authHeaders, 
-          signal: AbortSignal.timeout(2500) 
+          signal: AbortSignal.timeout(3000) 
         });
         if (resAsgn.ok) {
           const backendAssignments = await resAsgn.json();
@@ -1000,12 +1124,52 @@
         console.warn("[SkillSafe VR] Assignments sync skipped:", e.message);
       }
 
-      // 4. Fetch Real Training Sessions (for Learner)
+      // 5. Fetch AI Scenario Approvals Queue
+      try {
+        const resQueue = await fetch(`${apiUrl}/ai/queue`, {
+          headers: authHeaders,
+          signal: AbortSignal.timeout(3000)
+        });
+        if (resQueue.ok) {
+          const qData = await resQueue.json();
+          if (Array.isArray(qData) && qData.length > 0) {
+            S.approvalQueue = qData.map(q => ({
+              id: q.id,
+              title: q.title,
+              source: q.source,
+              prompt: q.prompt,
+              submittedDate: q.submitted_date,
+              status: q.status,
+              hazards: typeof q.hazards === 'string' ? JSON.parse(q.hazards) : (q.hazards || []),
+              mandatorySteps: typeof q.mandatory_steps === 'string' ? JSON.parse(q.mandatory_steps) : (q.mandatory_steps || []),
+              policyCheck: q.policy_check,
+              reviewerNotes: q.reviewer_notes || ''
+            }));
+          }
+        }
+      } catch(e) {
+        console.warn("[SkillSafe VR] AI Queue sync skipped:", e.message);
+      }
+
+      // 6. Fetch All Skill Passports
+      try {
+        const resAllPass = await fetch(`${apiUrl}/passports`, {
+          headers: authHeaders,
+          signal: AbortSignal.timeout(3000)
+        });
+        if (resAllPass.ok) {
+          S.allPassports = await resAllPass.json();
+        }
+      } catch(e) {
+        console.warn("[SkillSafe VR] All passports sync skipped:", e.message);
+      }
+
+      // 7. Fetch Real Training Sessions (for Learner)
       if (AUTH_USER && AUTH_USER.id) {
         try {
           const resSess = await fetch(`${apiUrl}/sessions?learner_id=${AUTH_USER.id}`, {
             headers: authHeaders,
-            signal: AbortSignal.timeout(2500)
+            signal: AbortSignal.timeout(3000)
           });
           if (resSess.ok) {
             const sessions = await resSess.json();
@@ -1036,12 +1200,12 @@
         }
       }
 
-      // 5. Fetch Real Skill Passport
+      // 8. Fetch Current Learner Skill Passport
       if (S.traineeId) {
         try {
           const resPass = await fetch(`${apiUrl}/passports/${S.traineeId}`, { 
             headers: authHeaders, 
-            signal: AbortSignal.timeout(2500) 
+            signal: AbortSignal.timeout(3000) 
           });
           if (resPass.ok) {
             const passData = await resPass.json();
@@ -1055,6 +1219,7 @@
                 issuedDate: passData.issued_date,
                 verifiedBy: passData.verified_by,
                 verificationHash: passData.verification_hash,
+                status: passData.status,
                 competencies: passData.competencies
               };
             }
@@ -1064,6 +1229,7 @@
         }
       }
 
+      window.syncWithBackend = syncWithBackend;
       try { localStorage.setItem('ssvr', JSON.stringify(S)); } catch(e){}
       console.log("[SkillSafe VR] Complete real database synchronization finished.");
 

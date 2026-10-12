@@ -35,6 +35,29 @@ pool.on('error', (err) => {
 app.use(cors());
 app.use(express.json());
 
+// Global WebSocket Client Registries & Live Broadcast Helpers
+const connectedClients = new Set();
+const instructorClients = new Set();
+const telemetryBuffer = [];
+
+function broadcastToInstructors(data) {
+  const payload = JSON.stringify(data);
+  instructorClients.forEach(client => {
+    if (client.readyState === 1) { // 1 = WebSocket.OPEN
+      try { client.send(payload); } catch(e){}
+    }
+  });
+}
+
+function broadcastToAll(data) {
+  const payload = JSON.stringify(data);
+  connectedClients.forEach(client => {
+    if (client.readyState === 1) {
+      try { client.send(payload); } catch(e){}
+    }
+  });
+}
+
 
 // ====================================================================
 // AUTHENTICATION MIDDLEWARE
@@ -402,17 +425,375 @@ app.get('/api/v1/modules', async (req, res) => {
   }
 });
 
-// Assignments endpoint
+// ====================================================================
+// CORE WORKSPACE & TRAINER/TRAINEE LIVE DATA ENDPOINTS (Neon PostgreSQL)
+// ====================================================================
+
+// 1. All Users (Trainees Roster with live session performance aggregations)
+app.get('/api/v1/auth/users', async (req, res) => {
+  try {
+    const q = `
+      SELECT 
+        u.id, u.name, u.email, u.role, u.batch, u.trainee_id, u.avatar_url, u.created_at,
+        COUNT(s.id)::int as total_sessions,
+        COALESCE(ROUND(AVG(s.safety_score)), 0)::int as avg_safety,
+        COALESCE(ROUND(AVG(s.score)), 0)::int as avg_score,
+        MAX(s.created_at) as last_active,
+        COALESCE(SUM(CASE WHEN s.critical_gate_passed = false THEN 1 ELSE 0 END), 0)::int as critical_violations
+      FROM users u
+      LEFT JOIN training_sessions s ON s.learner_id = u.id OR s.learner_id = u.trainee_id
+      GROUP BY u.id, u.name, u.email, u.role, u.batch, u.trainee_id, u.avatar_url, u.created_at
+      ORDER BY u.role, u.name
+    `;
+    const result = await pool.query(q);
+    return res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching users:', err.message);
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 2. Trainer Cohort Real-Time Stats (Tab 1: Cohort Overview & Alerts)
+app.get('/api/v1/trainer/cohort-stats', async (req, res) => {
+  try {
+    const traineesCount = await pool.query("SELECT count(*)::int FROM users WHERE role = 'learner'");
+    const activeTasks = await pool.query("SELECT count(*)::int FROM assignments WHERE status = 'in_progress'");
+    const sessStats = await pool.query(`
+      SELECT 
+        count(*)::int as total_sessions,
+        COALESCE(ROUND(AVG(safety_score)), 100)::int as avg_safety,
+        COALESCE(SUM(CASE WHEN critical_gate_passed = false OR safety_score < 70 THEN 1 ELSE 0 END), 0)::int as critical_alerts
+      FROM training_sessions
+    `);
+    
+    // Aggregate mistakes from JSON
+    const mistakeRows = await pool.query("SELECT mistakes FROM training_sessions WHERE mistakes IS NOT NULL");
+    const mistakeCounts = {};
+    mistakeRows.rows.forEach(r => {
+      let mList = r.mistakes;
+      if (typeof mList === 'string') {
+        try { mList = JSON.parse(mList); } catch(e){ mList = []; }
+      }
+      if (Array.isArray(mList)) {
+        mList.forEach(m => {
+          mistakeCounts[m] = (mistakeCounts[m] || 0) + 1;
+        });
+      }
+    });
+
+    // Recent 10 completed sessions
+    const recentSess = await pool.query(`
+      SELECT s.*, u.name as learner_name, u.batch as learner_batch
+      FROM training_sessions s
+      LEFT JOIN users u ON u.id = s.learner_id OR u.trainee_id = s.learner_id
+      ORDER BY s.created_at DESC
+      LIMIT 10
+    `);
+
+    return res.json({
+      enrolled_trainees: traineesCount.rows[0].count,
+      cohort_avg_safety: sessStats.rows[0].avg_safety,
+      active_curriculum_tasks: activeTasks.rows[0].count,
+      critical_safety_alerts: sessStats.rows[0].critical_alerts,
+      total_sessions_completed: sessStats.rows[0].total_sessions,
+      incident_breakdown: mistakeCounts,
+      recent_sessions: recentSess.rows
+    });
+  } catch (err) {
+    console.error('Error fetching cohort stats:', err.message);
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 3. Assignments: Query real curriculum assignments
 app.get('/api/v1/assignments', async (req, res) => {
   try {
-    const asgnsRes = await pool.query('SELECT * FROM assignments ORDER BY id');
+    const asgnsRes = await pool.query('SELECT * FROM assignments ORDER BY assigned_date DESC, id DESC');
     return res.json(asgnsRes.rows);
   } catch (err) {
     return res.status(500).json({ detail: err.message });
   }
 });
 
-// Skill Passports: Current user passports
+// 4. Assignments: Create new assignment (Tab 3: Assignment Builder)
+app.post('/api/v1/assignments', async (req, res) => {
+  const {
+    title,
+    module_id,
+    batch,
+    instructor_name,
+    due_date,
+    time_limit_mins,
+    pass_criteria,
+    max_attempts,
+    mandatory_steps,
+    critical_safety_gate,
+    description
+  } = req.body || {};
+
+  if (!title) return res.status(400).json({ detail: 'Assignment title is required' });
+
+  const asgnId = `asgn_${Date.now()}`;
+  const nowStr = new Date().toISOString().slice(0, 10);
+
+  try {
+    const insertRes = await pool.query(`
+      INSERT INTO assignments (
+        id, title, module_id, batch, instructor_name, assigned_date, due_date,
+        time_limit_mins, pass_criteria, max_attempts, mandatory_steps,
+        critical_safety_gate, status, description
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING *
+    `, [
+      asgnId,
+      title,
+      module_id || 'elec',
+      batch || 'Industrial Electrical Batch A-24',
+      instructor_name || 'Saurav K (Trainer)',
+      nowStr,
+      due_date || nowStr,
+      time_limit_mins || 15,
+      pass_criteria || 85,
+      max_attempts || 3,
+      JSON.stringify(mandatory_steps || ['Inspect work area', 'Wear PPE', 'Execute sequence flawlessly']),
+      critical_safety_gate !== false,
+      'in_progress',
+      description || `Curriculum assignment published by ${instructor_name || 'Instructor'}.`
+    ]);
+
+    const newAsgn = insertRes.rows[0];
+
+    // Log to audit trail
+    await pool.query(`
+      INSERT INTO audit_logs (timestamp, user_name, action, category, detail)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      new Date().toISOString().replace('T', ' ').slice(0, 19),
+      instructor_name || 'Trainer',
+      'CREATE_ASSIGNMENT',
+      'CURRICULUM',
+      `Published assignment "${title}" to cohort "${batch}".`
+    ]);
+
+    // Broadcast live to all connected WebSocket clients
+    broadcastToAll({
+      type: 'NEW_ASSIGNMENT',
+      assignment: newAsgn
+    });
+
+    return res.status(201).json(newAsgn);
+  } catch (err) {
+    console.error('Error creating assignment:', err.message);
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 5. Assignments: Delete assignment
+app.delete('/api/v1/assignments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM assignments WHERE id = $1', [id]);
+    broadcastToAll({ type: 'ASSIGNMENT_DELETED', assignmentId: id });
+    return res.json({ success: true, id });
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 6. Training Sessions: Query real session history
+app.get('/api/v1/sessions', async (req, res) => {
+  try {
+    const { learner_id, module_id } = req.query;
+    let query = `
+      SELECT s.*, u.name as learner_name, u.batch as learner_batch
+      FROM training_sessions s
+      LEFT JOIN users u ON u.id = s.learner_id OR u.trainee_id = s.learner_id
+    `;
+    const params = [];
+    const wheres = [];
+    if (learner_id) {
+      params.push(learner_id);
+      wheres.push(`(s.learner_id = $${params.length} OR u.trainee_id = $${params.length})`);
+    }
+    if (module_id) {
+      params.push(module_id);
+      wheres.push(`s.module_id = $${params.length}`);
+    }
+    if (wheres.length > 0) {
+      query += ` WHERE ${wheres.join(' AND ')}`;
+    }
+    query += ' ORDER BY s.created_at DESC LIMIT 50';
+
+    const result = await pool.query(query, params);
+    return res.json(result.rows);
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 7. Training Sessions: Commit simulation result (LIVE TRAINEE -> TRAINER CONNECTION)
+app.post('/api/v1/sessions', async (req, res) => {
+  const {
+    learner_id,
+    module_id,
+    assignment_id,
+    date_str,
+    score,
+    safety_score,
+    procedure_score,
+    hazard_score,
+    task_completion,
+    time_efficiency,
+    duration_secs,
+    mistakes,
+    critical_gate_passed,
+    telemetry_events
+  } = req.body || {};
+
+  const sessId = `sess_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  const now = new Date();
+  const dateString = date_str || now.toLocaleDateString();
+
+  try {
+    const insertRes = await pool.query(`
+      INSERT INTO training_sessions (
+        id, learner_id, module_id, assignment_id, date_str, score, safety_score,
+        procedure_score, hazard_score, task_completion, time_efficiency,
+        duration_secs, mistakes, critical_gate_passed, telemetry_events, created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+      RETURNING *
+    `, [
+      sessId,
+      learner_id || 'u_anonymous',
+      module_id || 'elec',
+      assignment_id || null,
+      dateString,
+      Math.round(score || 0),
+      Math.round(safety_score || 0),
+      Math.round(procedure_score || 0),
+      Math.round(hazard_score || 0),
+      Math.round(task_completion || 0),
+      Math.round(time_efficiency || 0),
+      Math.round(duration_secs || 0),
+      JSON.stringify(mistakes || []),
+      critical_gate_passed !== false,
+      JSON.stringify(telemetry_events || [])
+    ]);
+
+    const session = insertRes.rows[0];
+
+    // Find trainee identity
+    let traineeInfo = { name: 'Trainee', trainee_id: learner_id, batch: 'Vocational Engineering Batch' };
+    const userRes = await pool.query('SELECT name, trainee_id, batch FROM users WHERE id = $1 OR trainee_id = $1', [learner_id]);
+    if (userRes.rows.length > 0) {
+      traineeInfo = userRes.rows[0];
+    }
+
+    // Log to audit trail
+    await pool.query(`
+      INSERT INTO audit_logs (timestamp, user_name, action, category, detail)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      now.toISOString().replace('T', ' ').slice(0, 19),
+      traineeInfo.name,
+      'SIMULATION_COMPLETED',
+      'SIMULATION',
+      `Completed ${module_id.toUpperCase()} simulation. Score: ${Math.round(score || 0)}%, Safety: ${Math.round(safety_score || 0)}%, Critical Gate: ${critical_gate_passed !== false ? 'PASSED' : 'VIOLATION'}`
+    ]);
+
+    // BROADCAST LIVE OVER WEBSOCKET TO TRAINER / INSTRUCTOR MONITORS
+    broadcastToInstructors({
+      type: 'SESSION_COMPLETED',
+      session,
+      trainee: traineeInfo
+    });
+
+    return res.status(201).json({ success: true, session });
+  } catch (err) {
+    console.error('Error saving session:', err.message);
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 8. AI Scenario Queue: Fetch proposals (Tab 4: AI Approvals)
+app.get('/api/v1/ai/queue', async (req, res) => {
+  try {
+    const qRes = await pool.query('SELECT * FROM ai_scenario_queue ORDER BY id DESC');
+    return res.json(qRes.rows);
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 9. AI Scenario Queue: Approve or reject proposal
+app.patch('/api/v1/ai/queue/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status, reviewer_notes } = req.body || {};
+
+  try {
+    const updateRes = await pool.query(`
+      UPDATE ai_scenario_queue
+      SET status = $1, reviewer_notes = $2
+      WHERE id = $3
+      RETURNING *
+    `, [status || 'approved', reviewer_notes || '', id]);
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ detail: 'AI scenario not found in queue' });
+    }
+
+    const updated = updateRes.rows[0];
+
+    // Log to audit trail
+    await pool.query(`
+      INSERT INTO audit_logs (timestamp, user_name, action, category, detail)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      new Date().toISOString().replace('T', ' ').slice(0, 19),
+      'Saurav K (Trainer)',
+      status === 'approved' ? 'APPROVE_SCENARIO' : 'REJECT_SCENARIO',
+      'GOVERNANCE',
+      `${status === 'approved' ? 'Approved' : 'Rejected'} AI scenario: ${updated.title}`
+    ]);
+
+    // Broadcast to all clients
+    broadcastToAll({
+      type: 'SCENARIO_STATUS_CHANGED',
+      scenario: updated
+    });
+
+    return res.json(updated);
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 10. Skill Passports: Fetch all passports with competencies (Tab 5: Passport Sign-Off)
+app.get('/api/v1/passports', async (req, res) => {
+  try {
+    const passportsRes = await pool.query('SELECT * FROM skill_passports ORDER BY full_name');
+    const compsRes = await pool.query('SELECT * FROM competencies ORDER BY code');
+
+    const compsByPassport = {};
+    compsRes.rows.forEach(c => {
+      if (!compsByPassport[c.passport_id]) compsByPassport[c.passport_id] = [];
+      compsByPassport[c.passport_id].push(c);
+    });
+
+    const passports = passportsRes.rows.map(p => ({
+      ...p,
+      competencies: compsByPassport[p.id] || []
+    }));
+
+    return res.json(passports);
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 11. Skill Passports: Current user passport
 app.get('/api/v1/passports/my', async (req, res) => {
   const decoded = verifyToken(req);
   if (!decoded) {
@@ -420,13 +801,34 @@ app.get('/api/v1/passports/my', async (req, res) => {
   }
   try {
     const passRes = await pool.query('SELECT * FROM skill_passports WHERE trainee_id = $1 OR full_name = $2 ORDER BY id DESC', [decoded.sub, decoded.name]);
-    return res.json(passRes.rows);
+    if (passRes.rows.length === 0) return res.json([]);
+    const passport = passRes.rows[0];
+    const compsRes = await pool.query('SELECT * FROM competencies WHERE passport_id = $1 ORDER BY code', [passport.id]);
+    passport.competencies = compsRes.rows;
+    return res.json([passport]);
   } catch (err) {
     return res.status(500).json({ detail: err.message });
   }
 });
 
-// Skill Passports: Verification by hash (API)
+// 12. Skill Passports: Trainee specific passport
+app.get('/api/v1/passports/:traineeId', async (req, res) => {
+  const { traineeId } = req.params;
+  try {
+    const passRes = await pool.query('SELECT * FROM skill_passports WHERE trainee_id = $1 OR id = $1', [traineeId]);
+    if (passRes.rows.length === 0) {
+      return res.status(404).json({ detail: 'Passport not found for trainee' });
+    }
+    const passport = passRes.rows[0];
+    const compsRes = await pool.query('SELECT * FROM competencies WHERE passport_id = $1 ORDER BY code', [passport.id]);
+    passport.competencies = compsRes.rows;
+    return res.json(passport);
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 13. Skill Passports: Verification by hash (API)
 app.get('/api/v1/passports/verify/:hash', async (req, res) => {
   const hash = req.params.hash;
   try {
@@ -434,7 +836,173 @@ app.get('/api/v1/passports/verify/:hash', async (req, res) => {
     if (passRes.rows.length === 0) {
       return res.status(404).json({ valid: false, detail: 'Passport hash not found in registry.' });
     }
-    return res.json({ valid: true, passport: passRes.rows[0] });
+    const passport = passRes.rows[0];
+    const compsRes = await pool.query('SELECT * FROM competencies WHERE passport_id = $1 ORDER BY code', [passport.id]);
+    return res.json({
+      valid: true,
+      full_name: passport.full_name,
+      trainee_id: passport.trainee_id,
+      institution: passport.institution,
+      council: passport.council,
+      verified_by: passport.verified_by,
+      verification_hash: passport.verification_hash,
+      status: passport.status,
+      verified_competencies_count: compsRes.rows.filter(c => c.status === 'VERIFIED').length,
+      competency_list: compsRes.rows.filter(c => c.status === 'VERIFIED').map(c => `${c.code}: ${c.title}`)
+    });
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 14. Skill Passports: Endorse competency (LIVE TRAINER SIGN-OFF)
+app.post('/api/v1/passports/endorse', async (req, res) => {
+  const { trainee_id, competency_code, certifier_name } = req.body || {};
+  if (!competency_code) {
+    return res.status(400).json({ detail: 'Competency code is required' });
+  }
+
+  try {
+    let pRes = await pool.query(
+      'SELECT * FROM skill_passports WHERE trainee_id = $1 OR id = $1',
+      [trainee_id]
+    );
+    if (pRes.rows.length === 0) {
+      pRes = await pool.query('SELECT * FROM skill_passports LIMIT 1');
+    }
+    if (pRes.rows.length === 0) {
+      return res.status(404).json({ detail: 'Skill passport not found in registry' });
+    }
+
+    const passport = pRes.rows[0];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const certifier = certifier_name || 'Saurav K (Lic #REC-TR-2024)';
+
+    // Update competency in DB
+    const compRes = await pool.query(`
+      UPDATE competencies
+      SET status = 'VERIFIED', verified_date = $1, certifier = $2
+      WHERE passport_id = $3 AND code = $4
+      RETURNING *
+    `, [todayStr, certifier, passport.id, competency_code]);
+
+    // Recalculate cryptographic hash based on verified competencies
+    const allComps = await pool.query('SELECT * FROM competencies WHERE passport_id = $1', [passport.id]);
+    const verifiedCodes = allComps.rows.filter(c => c.status === 'VERIFIED').map(c => c.code).sort().join('-');
+    const newHash = '0x' + crypto.createHash('sha256').update(`${passport.trainee_id}-${passport.full_name}-${verifiedCodes}-${todayStr}`).digest('hex').substring(0, 24).toUpperCase();
+    const allVerified = allComps.rows.every(c => c.status === 'VERIFIED');
+    const newStatus = allVerified ? 'VERIFIED' : 'IN_TRAINING';
+
+    await pool.query(`
+      UPDATE skill_passports
+      SET verification_hash = $1, status = $2, verified_by = $3
+      WHERE id = $4
+    `, [newHash, newStatus, certifier, passport.id]);
+
+    // Audit log
+    await pool.query(`
+      INSERT INTO audit_logs (timestamp, user_name, action, category, detail)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      new Date().toISOString().replace('T', ' ').slice(0, 19),
+      certifier,
+      'ENDORSE_COMPETENCY',
+      'CREDENTIAL',
+      `Endorsed competency ${competency_code} for ${passport.full_name} (${passport.trainee_id}). Hash: ${newHash}`
+    ]);
+
+    // Broadcast live over WebSocket to Trainee
+    broadcastToAll({
+      type: 'COMPETENCY_ENDORSED',
+      trainee_id: passport.trainee_id,
+      passport_id: passport.id,
+      competency_code,
+      certifier,
+      new_hash: newHash,
+      new_status: newStatus
+    });
+
+    return res.json({
+      success: true,
+      competency: compRes.rows[0],
+      verification_hash: newHash,
+      passport_status: newStatus
+    });
+  } catch (err) {
+    console.error('Endorse error:', err.message);
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 15. Targeted Practice Drill Dispatch (Tab 6: Targeted Remediation)
+app.post('/api/v1/trainer/dispatch-drill', async (req, res) => {
+  const { trainee_name, trainee_id, topic, module_id, due_days } = req.body || {};
+  if (!topic) return res.status(400).json({ detail: 'Drill topic is required' });
+
+  const asgnId = `asgn_rem_${Date.now()}`;
+  const now = new Date();
+  const dueDate = new Date(now.getTime() + (due_days || 3) * 864e5).toISOString().slice(0, 10);
+
+  try {
+    const insertRes = await pool.query(`
+      INSERT INTO assignments (
+        id, title, module_id, batch, instructor_name, assigned_date, due_date,
+        time_limit_mins, pass_criteria, max_attempts, mandatory_steps,
+        critical_safety_gate, status, description
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING *
+    `, [
+      asgnId,
+      `🎯 Targeted Drill: ${topic}`,
+      module_id || 'elec',
+      `Targeted Remediation — ${trainee_name || 'Cohort'}`,
+      'Saurav K (Trainer)',
+      now.toISOString().slice(0, 10),
+      dueDate,
+      10,
+      90,
+      3,
+      JSON.stringify(['Review procedure guidelines', 'Equip mandatory safety gear', 'Execute protocol without safety infractions']),
+      true,
+      'in_progress',
+      `Targeted practice drill assigned to address specific risk pattern in ${topic}.`
+    ]);
+
+    const newDrill = insertRes.rows[0];
+
+    // Log to audit trail
+    await pool.query(`
+      INSERT INTO audit_logs (timestamp, user_name, action, category, detail)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      now.toISOString().replace('T', ' ').slice(0, 19),
+      'Saurav K (Trainer)',
+      'DISPATCH_REMEDIATION',
+      'REMEDIATION',
+      `Dispatched targeted drill "${topic}" to ${trainee_name || 'Cohort'}.`
+    ]);
+
+    // Broadcast live over WebSocket to all trainees
+    broadcastToAll({
+      type: 'DRILL_DISPATCHED',
+      drill: newDrill,
+      trainee_id: trainee_id || null,
+      trainee_name: trainee_name || 'Cohort'
+    });
+
+    return res.status(201).json(newDrill);
+  } catch (err) {
+    console.error('Error dispatching drill:', err.message);
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// 16. Audit Logs: Real governance activity trail
+app.get('/api/v1/audit/logs', async (req, res) => {
+  try {
+    const logsRes = await pool.query('SELECT * FROM audit_logs ORDER BY id DESC LIMIT 50');
+    return res.json(logsRes.rows);
   } catch (err) {
     return res.status(500).json({ detail: err.message });
   }
@@ -491,10 +1059,8 @@ app.use('/api', async (req, res) => {
 app.get('/verify/:hash', async (req, res) => {
   const hash = req.params.hash;
   try {
-    const fastApiRes = await fetch(`${FASTAPI_URL}/api/v1/passports/verify/${hash}`);
-    const data = await fastApiRes.json();
-    
-    if (!data.valid) {
+    const passRes = await pool.query('SELECT * FROM skill_passports WHERE verification_hash = $1', [hash]);
+    if (passRes.rows.length === 0) {
       return res.status(404).send(`
         <!DOCTYPE html>
         <html lang="en">
@@ -523,6 +1089,21 @@ app.get('/verify/:hash', async (req, res) => {
         </html>
       `);
     }
+
+    const passport = passRes.rows[0];
+    const compsRes = await pool.query('SELECT * FROM competencies WHERE passport_id = $1 ORDER BY code', [passport.id]);
+    const data = {
+      valid: true,
+      full_name: passport.full_name,
+      trainee_id: passport.trainee_id,
+      institution: passport.institution,
+      council: passport.council,
+      verified_by: passport.verified_by,
+      verification_hash: passport.verification_hash,
+      status: passport.status,
+      verified_competencies_count: compsRes.rows.filter(c => c.status === 'VERIFIED').length,
+      competency_list: compsRes.rows.filter(c => c.status === 'VERIFIED').map(c => `${c.code}: ${c.title}`)
+    };
 
     const compsHtml = (data.competency_list || []).map(c => `
       <div style="background:#09121d;border:1px solid #1e2e42;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -709,9 +1290,6 @@ checkPostgres();
 // WebSocket Server for High-Frequency VR Telemetry Streaming
 // ====================================================================
 const wss = new WebSocketServer({ server, path: '/ws/telemetry' });
-const connectedClients = new Set();
-const instructorClients = new Set();
-const telemetryBuffer = [];
 
 wss.on('connection', (ws, req) => {
   // Verify WebSocket authentication via query param

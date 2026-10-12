@@ -1,5 +1,5 @@
 // =========================================================================
-// ⚡ SKILLSAFE VR: ADVANCED 3D VOCATIONAL WORKSHOPS EXTENSION (v6.0)
+// ⚡ SKILLSAFE VR: ADVANCED 3D VOCATIONAL WORKSHOPS EXTENSION (v7.0)
 // Modules:
 // 1. 🏗️ Construction Safety (Work at Height, Scaffolding, Drop Zone, Fall Arrest Lifeline)
 // 2. ⚙️ Machine Operation (Heavy Lathe / CNC Safety, Guards, E-Stop, Push Stick, LOTO)
@@ -10,6 +10,253 @@
 (function() {
   window.V = window.V || {};
   window.I = window.I || {};
+
+  // =========================================================================
+  // 🔊 PROCEDURAL AUDIO SYNTHESIZER (ZERO-LATENCY WEB AUDIO API ENGINE)
+  // =========================================================================
+  const AudioFX = (function() {
+    let ctx = null;
+    const getCtx = () => {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) ctx = new AC();
+      }
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      return ctx;
+    };
+
+    if (typeof window !== 'undefined') {
+      const unlock = () => {
+        getCtx();
+        window.removeEventListener('pointerdown', unlock);
+        window.removeEventListener('keydown', unlock);
+      };
+      window.addEventListener('pointerdown', unlock);
+      window.addEventListener('keydown', unlock);
+    }
+
+    return {
+      // Footsteps with surface acoustics
+      step: function(surface) {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        if (surface === 'wood') {
+          // Hollow timber scaffold deck resonance
+          const o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter();
+          o.type = 'triangle';
+          o.frequency.setValueAtTime(140 + Math.random() * 25, t);
+          o.frequency.exponentialRampToValueAtTime(45, t + 0.1);
+          f.type = 'bandpass'; f.frequency.value = 320; f.Q.value = 2.0;
+          g.gain.setValueAtTime(0.18, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+          o.connect(f); f.connect(g); g.connect(ac.destination);
+          o.start(t); o.stop(t + 0.13);
+        } else if (surface === 'rung') {
+          // Tubular steel ladder rung metallic ping
+          const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
+          o1.type = 'sine'; o1.frequency.setValueAtTime(820, t);
+          o1.frequency.exponentialRampToValueAtTime(740, t + 0.15);
+          o2.type = 'square'; o2.frequency.setValueAtTime(1640, t);
+          o2.frequency.exponentialRampToValueAtTime(1200, t + 0.08);
+          g.gain.setValueAtTime(0.15, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+          o1.connect(g); o2.connect(g); g.connect(ac.destination);
+          o1.start(t); o2.start(t); o1.stop(t + 0.19); o2.stop(t + 0.19);
+        } else {
+          // Concrete floor thump
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(90, t);
+          o.frequency.exponentialRampToValueAtTime(35, t + 0.09);
+          g.gain.setValueAtTime(0.14, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+          o.connect(g); g.connect(ac.destination);
+          o.start(t); o.stop(t + 0.11);
+        }
+      },
+
+      // Mechanical ratchet torque wrench clicks
+      ratchet: function(isFinal) {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        if (isFinal) {
+          // Calibrated torque wrench break-away "CRACK-CLICK"
+          const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
+          o1.type = 'sawtooth'; o1.frequency.setValueAtTime(260, t);
+          o1.frequency.exponentialRampToValueAtTime(90, t + 0.14);
+          o2.type = 'square'; o2.frequency.setValueAtTime(1850, t);
+          o2.frequency.exponentialRampToValueAtTime(600, t + 0.08);
+          g.gain.setValueAtTime(0.28, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+          o1.connect(g); o2.connect(g); g.connect(ac.destination);
+          o1.start(t); o2.start(t); o1.stop(t + 0.17); o2.stop(t + 0.17);
+        } else {
+          // High-tensile pawl tooth click
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = 'square'; o.frequency.setValueAtTime(1400 + Math.random() * 200, t);
+          o.frequency.exponentialRampToValueAtTime(450, t + 0.04);
+          g.gain.setValueAtTime(0.12, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+          o.connect(g); g.connect(ac.destination);
+          o.start(t); o.stop(t + 0.06);
+        }
+      },
+
+      // Interlock door latch snap
+      latch: function() {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'triangle'; o.frequency.setValueAtTime(950, t);
+        o.frequency.exponentialRampToValueAtTime(220, t + 0.07);
+        g.gain.setValueAtTime(0.22, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t + 0.09);
+      },
+
+      // Heavy E-Stop mushroom slap
+      estop: function() {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        const o1 = ac.createOscillator(), g1 = ac.createGain();
+        o1.type = 'sine'; o1.frequency.setValueAtTime(65, t);
+        o1.frequency.exponentialRampToValueAtTime(25, t + 0.2);
+        g1.gain.setValueAtTime(0.35, t);
+        g1.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        o1.connect(g1); g1.connect(ac.destination);
+        o1.start(t); o1.stop(t + 0.23);
+
+        const o2 = ac.createOscillator(), g2 = ac.createGain();
+        o2.type = 'sawtooth'; o2.frequency.setValueAtTime(1150, t);
+        o2.frequency.exponentialRampToValueAtTime(320, t + 0.1);
+        g2.gain.setValueAtTime(0.25, t);
+        g2.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        o2.connect(g2); g2.connect(ac.destination);
+        o2.start(t); o2.stop(t + 0.13);
+      },
+
+      // Spindle dynamic injection brake screech
+      dynamicBrake: function() {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(480, t);
+        o.frequency.exponentialRampToValueAtTime(50, t + 0.28);
+        g.gain.setValueAtTime(0.2, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t + 0.32);
+      },
+
+      // Bench brush bristle sweep
+      brushSweep: function() {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        const bSize = Math.floor(ac.sampleRate * 0.18);
+        const buf = ac.createBuffer(1, bSize, ac.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bSize; i++) data[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * (i / bSize));
+        const src = ac.createBufferSource(); src.buffer = buf;
+        const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1600; f.Q.value = 1.2;
+        const g = ac.createGain(); g.gain.setValueAtTime(0.16, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        src.connect(f); f.connect(g); g.connect(ac.destination);
+        src.start(t);
+      },
+
+      // Dropped metal spanner impact & floor bounce
+      toolCrash: function() {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        [0, 0.08, 0.16].forEach((dt, idx) => {
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = 'sawtooth';
+          o.frequency.setValueAtTime((850 - idx * 160) + Math.random() * 80, t + dt);
+          o.frequency.exponentialRampToValueAtTime(300, t + dt + 0.1);
+          g.gain.setValueAtTime(0.28 / (idx + 1), t + dt);
+          g.gain.exponentialRampToValueAtTime(0.001, t + dt + 0.12);
+          o.connect(g); g.connect(ac.destination);
+          o.start(t + dt); o.stop(t + dt + 0.13);
+        });
+      },
+
+      // Dual-tone industrial air horn blast
+      airHorn: function() {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        [440, 554].forEach(freq => {
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = 'sawtooth'; o.frequency.value = freq;
+          g.gain.setValueAtTime(0.0, t);
+          g.gain.linearRampToValueAtTime(0.22, t + 0.04);
+          g.gain.setValueAtTime(0.22, t + 0.45);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+          o.connect(g); g.connect(ac.destination);
+          o.start(t); o.stop(t + 0.68);
+        });
+      },
+
+      // Metal grinding sparks / swarf cutting
+      sparkSpray: function(duration) {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        const dur = duration || 0.25;
+        const bSize = Math.floor(ac.sampleRate * dur);
+        const buf = ac.createBuffer(1, bSize, ac.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bSize; i++) data[i] = (Math.random() * 2 - 1) * 0.7;
+        const src = ac.createBufferSource(); src.buffer = buf;
+        const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2800;
+        const g = ac.createGain(); g.gain.setValueAtTime(0.15, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        src.connect(f); f.connect(g); g.connect(ac.destination);
+        src.start(t);
+      },
+
+      // Brass padlock snap
+      padlock: function() {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(1400, t);
+        o.frequency.exponentialRampToValueAtTime(260, t + 0.06);
+        g.gain.setValueAtTime(0.24, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t + 0.09);
+      },
+
+      // Scafftag paper / vinyl inspection card rustle
+      tagRustle: function() {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'triangle'; o.frequency.setValueAtTime(620, t);
+        o.frequency.exponentialRampToValueAtTime(180, t + 0.08);
+        g.gain.setValueAtTime(0.12, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t + 0.1);
+      },
+
+      // Clean procedural tone
+      tone: function(f, d) {
+        const ac = getCtx(); if (!ac) return;
+        const t = ac.currentTime;
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sine'; o.frequency.value = f || 440;
+        g.gain.setValueAtTime(0.1, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + (d || 0.15));
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t + (d || 0.15) + 0.02);
+      }
+    };
+  })();
+  window.AudioFX = AudioFX;
+  window.beep = (f, d) => AudioFX.tone(f, d);
 
   // -----------------------------------------------------------------------
   // CONSTRUCTION SAFETY CONFIGURATION & DATA
@@ -100,22 +347,22 @@
       getSituation: () => st.bar ? "Drop zone barricaded: ground personnel protected." : "Establish a controlled drop zone perimeter to protect ground personnel (OSHA 1926.502)."
     },
     {
-      title: 'Climb & Anchor Harness to Lifeline',
-      action: "Click the overhead D-ring anchor clamp on the platform lifeline to connect your lanyard.",
-      voice: "Climb the ladder to the working deck. Click the overhead lifeline anchor to connect your shock-absorbing lanyard snap hook before stepping onto the plank.",
-      getSituation: () => st.anc ? "100% Tie-Off established: shock-absorbing lanyard secured to overhead anchor." : "100% tie-off is mandatory above 6 feet. Click the overhead lifeline anchor point."
+      title: 'Climb & Anchor Lifeline (100% Tie-Off)',
+      action: "Click the ladder or overhead lifeline D-ring on the scaffold platform to climb and hook on.",
+      voice: "Climb the ladder facing the rungs with hands free. On the working platform, connect your harness lanyard to the overhead static cable anchor.",
+      getSituation: () => st.anc ? "100% Tie-off secured: shock-absorbing lanyard clipped to overhead lifeline!" : "Never work at height unanchored. Connect to the overhead lifeline anchor trolley."
     },
     {
-      title: 'Perform Structural Fixing at Height',
-      action: "Click the steel I-beam bracket (or press E) to torque and tighten the structural bolts.",
-      voice: "You are securely anchored. Click the steel beam bracket or press E to align the joint and torque the structural connection bolts.",
-      getSituation: () => st.fix ? "Structural bolts torqued to specification." : "Perform the fixing task with two hands while tethered to the certified overhead lifeline."
+      title: 'Structural Beam Fixing at Height',
+      action: "Click the beam fixing bracket (or press E) to torque the structural bolts to 180 Nm.",
+      voice: "Use the torque wrench to secure the structural beam joint. Tighten all high-tensile bolts to 180 Newton meters while maintaining tethered tools.",
+      getSituation: () => st.fix ? "Structural joint torqued to 180 Nm and witnessed with torque stripe!" : "Align and torque the high-tensile bolts to structural specification."
     },
     {
-      title: 'Unclip, Descend & Clear Worksite',
-      action: "Click the scaffold ladder / tool pouch to safely unclip, descend and clear the site.",
-      voice: "Structural fixing complete. Secure all tools in your pouch, disconnect from the anchor line, and descend the ladder facing the rungs.",
-      getSituation: () => st.dsc ? "Descent complete and worksite verified safe!" : "Maintain 3 points of contact while descending the ladder."
+      title: 'Safe Descent & Site Clearance',
+      action: "Click the ladder or tool pouch to unclip, descend facing the rungs, and clear the site.",
+      voice: "Tether all hand tools in your pouch, unclip from the lifeline, and descend the ladder facing the rungs.",
+      getSituation: () => st.dsc ? "Descent completed safely! Site secured." : "Maintain 3 points of contact when descending the access ladder."
     }
   ];
 
@@ -125,29 +372,29 @@
   // MACHINE OPERATION CONFIGURATION & DATA
   // -----------------------------------------------------------------------
   const MSTEPS = [
-    'Read rotating parts & pinch point hazard signs',
-    'Pick up PPE (safety glasses, ear defenders, boots)',
-    'Wear PPE (shield eyes, ears and feet)',
-    'Check & close safety interlock guards',
-    'Test emergency stop trip & reset',
-    'Clear swarf & chips from bed with brush',
-    'Start machine spindle (green button)',
-    'Feed material using push stick (keep hands clear)',
-    'Press Stop & wait for spindle spin-down',
-    'Apply Lockout / Tagout (LOTO) padlock'
+    'Read rotating parts & pinch hazard signs',
+    'Pick up PPE (safety glasses, ear defenders, steel-toe boots)',
+    'Wear PPE (eye protection & ear defenders)',
+    'Close & latch interlocked chuck safety guard',
+    'Perform E-Stop pre-flight slap test',
+    'Clear bed & slideways of swarf using bench brush',
+    'Start machine spindle (1250 RPM)',
+    'Feed stock safely using wooden push stick',
+    'Stop spindle & verify zero rotation',
+    'Apply Lockout/Tagout (LOTO) padlock to disconnect'
   ];
 
   const MTIPS = [
-    'Click the ROTATING PARTS / PINCH POINT hazard signs on the wall.',
-    'Pick up the safety glasses, ear defenders and boots from the bench, then click Wear PPE.',
+    'Click the ROTATING CHUCK / PINCH POINTS signs on the wall.',
+    'Pick up safety glasses, ear defenders, and boots from the bench, then click Wear PPE.',
     'Click the [🦺 Wear PPE] button in the bottom dock.',
-    'Click the transparent polycarbonate safety guard to lower and lock it over the chuck.',
-    'Click the red mushroom E-Stop button on the console to test the trip circuit.',
-    'Click the bench brush / swarf tray to clear metal chips without using bare hands.',
-    'Click the green START button on the control console.',
-    'Click the material stock / push stick (or press E) to feed material safely.',
-    'Click the red STOP button and wait for the rotating spindle to come to a complete stop.',
-    'Click the yellow/red disconnect switch to attach your LOTO padlock.'
+    'Click the transparent polycarbonate chuck guard to swing it down and latch it shut.',
+    'Click the red mushroom Emergency Stop button on the front console to test trip function.',
+    'Click the bench brush & chip tray to sweep sharp metal turnings off the lathe shears.',
+    'Click the green START push-button on the control console.',
+    'Click the push stick tool (or press E) to feed workpiece stock into the cutter.',
+    'Click the red STOP button on the control console.',
+    'Click the main electrical disconnect switch box on the back wall to apply your LOTO padlock.'
   ];
 
   window.MSTEPS = MSTEPS;
@@ -176,7 +423,7 @@
     return '<div class="pc">' + [
       ['glasses', '🥽 Safety Glasses'],
       ['ear', '🎧 Ear Defenders'],
-      ['boots', '👢 Safety Boots']
+      ['boots', '🥾 Steel-Toe Boots']
     ].map(a => `<span class="${s.worn ? 'on' : (s.pick && s.pick.has(a[0]) ? 'pk' : '')}">${a[1]}${s.worn ? ' ✓' : (s.pick && s.pick.has(a[0]) ? ' · ready' : '')}</span>`).join('') + '</div>';
   };
 
@@ -184,73 +431,142 @@
 
   const MAC_GUIDE = [
     {
-      title: 'Machinery Hazard Warnings',
-      action: "Click the yellow 'ROTATING MACHINERY' or 'PINCH POINT' signs on the bay wall.",
-      voice: "Welcome to the heavy machinery workshop. Click the warning signs on the wall to review rotating spindle and pinch point hazard protocols.",
-      getSituation: () => "Rotating chucks at 1200+ RPM and power feed gears create severe entanglement and crush hazards (OSHA 1910.212)."
+      title: 'Rotating Machinery Hazards',
+      action: "Click the yellow 'ROTATING CHUCK' or blue 'PINCH POINTS' signs on the wall.",
+      voice: "Welcome to the heavy machine shop. Rotating chucks and pinch points cause catastrophic entanglement. Click the warning signs to acknowledge machine hazards.",
+      getSituation: () => "Never wear loose clothing, gloves, ties, or jewelry around spinning machine spindles (OSHA 1910.212)."
     },
     {
-      title: 'Select PPE (Glasses, Ear Defenders, Boots)',
-      action: "Click the Safety Glasses, Ear Defenders, and Steel-Toe Boots on the workbench to collect them.",
+      title: 'Select Machine PPE',
+      action: "Click the Safety Glasses, Ear Defenders, and Steel-Toe Boots on the workbench.",
       voice: () => st.pick.size === 0
-        ? "Turn to the bench. Collect your three required PPE items: impact safety glasses, ear defenders, and heavy steel-toe boots."
-        : (st.pick.size < 3 ? `Collected ${st.pick.size} of 3 items. Pick up remaining gear from the bench.` : "All gear collected! Click Wear P P E in the dock."),
-      getSituation: () => `Collected ${st.pick ? st.pick.size : 0} of 3 PPE items. Never operate high-speed rotating equipment without eye, hearing, and foot protection.`
+        ? "Turn to the bench. Collect impact safety glasses, industrial ear defenders, and safety footwear."
+        : (st.pick.size < 3 ? `Picked up ${st.pick.size} of 3 items. Collect remaining gear.` : "All PPE collected! Click Wear P P E in the dock."),
+      getSituation: () => `Collected ${st.pick ? st.pick.size : 0} of 3 items. Never operate machinery without eye and hearing protection.`
     },
     {
-      title: 'Wear Machinery PPE',
-      action: "Click the blue [🦺 Wear PPE] button in the dock to put on your safety gear.",
-      voice: "Click Wear P P E in the dock. Never wear loose ties, long jewelry, or baggy gloves near spinning chucks.",
-      getSituation: () => st.worn ? "PPE equipped! Eyes shielded from swarf, hearing protected from motor decibels." : "Put on safety glasses and ear defenders before approaching the lathe."
+      title: 'Wear Eye & Hearing Protection',
+      action: "Click the blue [🦺 Wear PPE] button in the bottom dock.",
+      voice: "Click Wear P P E. Secure impact glasses to shield against high-speed flying chips, and seat your hearing protection.",
+      getSituation: () => st.worn ? "Machine operator PPE fitted and verified!" : "High-speed metal chips travel at over 100 km/h: eye protection is non-negotiable."
     },
     {
-      title: 'Check & Close Safety Interlock Guard',
-      action: "Click the transparent polycarbonate safety guard to lower and interlock it over the chuck.",
-      voice: "Before powering up, click the transparent chuck shield to lower it into the locked position. The interlock prevents motor startup if open.",
-      getSituation: () => st.gd ? "Machine interlock guard closed and latched over rotating chuck." : "Never run rotating machinery with guards open or interlocks bypassed."
+      title: 'Close & Latch Interlock Guard',
+      action: "Click the transparent polycarbonate safety guard over the lathe chuck.",
+      voice: "The interlock guard prevents entanglement and deflects flying swarf. Click the curved guard to swing it closed over the chuck.",
+      getSituation: () => st.gd ? "Interlock guard latched shut: limit switch closed (Circuit OK)." : "The spindle motor interlock is OPEN. Machine will not start until guard is closed."
     },
     {
-      title: 'Test Emergency Stop & Reset',
-      action: "Click the red mushroom E-Stop button on the console to test the safety trip mechanism.",
-      voice: "Always verify your emergency stop works before starting work. Click the red palm button on the console to verify trip continuity, then reset it.",
-      getSituation: () => st.es ? "Emergency Stop trip tested and reset successfully." : "Test the E-Stop before machine operation so you know it will instantly halt the motor."
+      title: 'Emergency Stop Pre-Flight Slap Test',
+      action: "Click the red mushroom E-Stop button on the control console.",
+      voice: "Always verify safety shutdown circuits before powering equipment. Slap the red mushroom E-Stop button to test instantaneous trip.",
+      getSituation: () => st.es ? "Emergency Stop trip tested and verified functional!" : "A failed E-stop switch during a jam is fatal. Slap test the button before starting."
     },
     {
-      title: 'Clear Swarf & Chips with Bench Brush',
-      action: "Click the bench brush / swarf tray to clear metal chips away from the machine bed.",
-      voice: "Metal chips are razor sharp. Click the bench brush to sweep swarf into the tray. Never use your bare hands or compressed air.",
-      getSituation: () => st.clr ? "Work area and lathe bed swept clean of razor-sharp swarf." : "Never clear metal turnings with bare hands. Always use a dedicated machine brush."
+      title: 'Clear Bed & Swarf with Bench Brush',
+      action: "Click the bench brush & chip tray to sweep sharp turnings off the shears.",
+      voice: "Never use bare hands to clear razor-sharp metal turnings. Take the bench brush and sweep chips clear into the chip pan.",
+      getSituation: () => st.clr ? "Slideways and bed swept clean of swarf accumulation." : "Accumulated chips cause cutter jams and severe hand lacerations. Sweep the bed."
     },
     {
-      title: 'Start Machine Spindle (Green Button)',
-      action: "Click the green [START] button on the machine control console to power on the spindle.",
-      voice: "Work area clear and guards interlocked. Click the green Start button on the console to engage the spindle drive.",
-      getSituation: () => st.go ? "Spindle running at 1250 RPM. Sound and vibration normal." : "All pre-flight checks verified. Click green Start button to power on."
+      title: 'Start Spindle (1250 RPM)',
+      action: "Click the green START push-button on the control console.",
+      voice: "With the guard latched and bed clear, press the green START button to spin up the spindle to 1250 RPM.",
+      getSituation: () => st.go ? "Spindle running at 1250 RPM: rotational acoustics stable." : "Interlock closed. Press green START to energize the spindle drive."
     },
     {
-      title: 'Feed Material Using Push Stick',
-      action: "Click the material stock / push stick (or press E) to guide stock safely into the cutter.",
-      voice: "Spindle is at operating speed. Click the push stick or press E to feed material into the cutting path without putting your hands near the cutter.",
-      getSituation: () => st.fd ? "Material fed smoothly using safety push stick." : "Keep hands at least 150 mm away from cutting tools. Always utilize a push stick."
+      title: 'Feed Workpiece Stock with Push Stick',
+      action: "Click the wooden push stick (or press E) to advance material safely into the cutter.",
+      voice: "Keep your hands at least 200 millimeters away from spinning cutters. Use the notched wooden push stick to feed stock.",
+      getSituation: () => st.fd ? "Stock fed safely with push stick — hands kept outside the danger zone." : "Use the push stick to advance material. Never feed stock by hand near spinning tools."
     },
     {
-      title: 'Press Stop & Wait for Spin-Down',
-      action: "Click the red [STOP] button on the console and wait for the spindle to come to zero RPM.",
-      voice: "Feed complete. Click the red Stop button on the console. Stand back and wait until the spindle comes to a complete, full stop.",
-      getSituation: () => st.sp ? "Spindle completely stopped (0 RPM)." : "Spindles carry high rotational momentum. Wait for full spin-down before touching parts."
+      title: 'Stop Spindle & Verify Zero Motion',
+      action: "Click the red STOP button on the control console.",
+      voice: "Cycle complete. Press the red STOP button and wait for the spindle chuck to come to a complete dead stop.",
+      getSituation: () => st.sp ? "Spindle decelerated to 0 RPM: rotational hazard eliminated." : "Press STOP and verify zero motion before opening guards."
     },
     {
       title: 'Apply Lockout / Tagout (LOTO)',
-      action: "Click the yellow/red electrical disconnect switch on the wall to apply your safety padlock.",
-      voice: "Procedure finished. Click the electrical disconnect switch to apply your personal LOTO padlock and tag so no one accidentally re-energizes the machine.",
-      getSituation: () => st.lk ? "LOTO hasp and danger padlock securely attached to main disconnect." : "Apply Lockout Tagout before leaving machine unattended (OSHA 1910.147)."
+      action: "Click the main electrical disconnect switch box on the back wall.",
+      voice: "Isolate the power supply. Throw the disconnect handle down and attach your red LOTO danger padlock and hasp.",
+      getSituation: () => st.lk ? "Main power isolated: LOTO padlock and danger tag secured (OSHA 1910.147)." : "Equipment must be isolated and locked out before leaving the machine bay."
     }
   ];
 
   window.MAC_GUIDE = MAC_GUIDE;
 
   // -----------------------------------------------------------------------
-  // HUD BUILDERS
+  // SAFE-BOT AI VOICE & CHAT COACH (`mkCoach`)
+  // -----------------------------------------------------------------------
+  function mkCoach(opt) {
+    const chat = document.getElementById('chat');
+    if (!chat) return { say: () => {} };
+    let msgs = chat.querySelector('.msgs');
+    if (!msgs) {
+      chat.innerHTML = `
+        <div class="ch">
+          <span>🤖 SafeBot AI Safety Coach</span>
+          <div style="display:flex;gap:4px">
+            <button class="b o" style="padding:2px 8px;font-size:11px" onclick="document.getElementById('chat').classList.toggle('min')">_</button>
+          </div>
+        </div>
+        <div class="msgs"></div>
+        <div class="ci">
+          <input type="text" placeholder="Ask SafeBot about OSHA safety rules..." onkeydown="if(event.key==='Enter')window.askCoach&&window.askCoach(this.value)">
+          <button class="b" onclick="const i=this.previousElementSibling;window.askCoach&&window.askCoach(i.value)">Ask</button>
+        </div>
+      `;
+      msgs = chat.querySelector('.msgs');
+    }
+
+    const postMsg = (txt, isUser) => {
+      if (!msgs) return;
+      const m = document.createElement('div');
+      m.className = isUser ? 'cm u' : 'cm b';
+      m.textContent = txt;
+      msgs.appendChild(m);
+      msgs.scrollTop = msgs.scrollHeight;
+    };
+
+    window.askCoach = q => {
+      if (!q || !q.trim()) return;
+      postMsg(q, true);
+      const inp = chat.querySelector('.ci input');
+      if (inp) inp.value = '';
+
+      let answer = null;
+      for (const item of opt.kb) {
+        if (item[0].test(q)) {
+          answer = item[1];
+          break;
+        }
+      }
+      if (!answer) {
+        const p = opt.prog();
+        const cur = p.indexOf(false);
+        answer = cur >= 0
+          ? `Right now, focus on Step ${cur + 1}: ${opt.steps[cur]}. ${opt.tips[cur]}`
+          : "All standard procedures are verified! Maintain site vigilance and zero complacency.";
+      }
+      setTimeout(() => {
+        postMsg(answer, false);
+        if (typeof say === 'function') say(answer);
+      }, 350);
+    };
+
+    const say = (t, f) => {
+      postMsg(t, false);
+      if (typeof window.say === 'function') window.say(t, f);
+    };
+
+    return { say };
+  }
+
+  window.mkCoach = mkCoach;
+
+  // -----------------------------------------------------------------------
+  // HUD BUILDERS WITH INTERACTIVE REAL-WORLD SIMULATION ACTIONS
   // -----------------------------------------------------------------------
   function hudC() {
     const s = (typeof st !== 'undefined' && st ? st : window.st);
@@ -322,6 +638,16 @@
         <div class="hud-situational-tip">
           <b>Current Situation:</b> ${situationText}
         </div>
+      </div>
+    `;
+
+    // Interactive 3D World Simulation Actions Toolbar
+    h += `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+        <button class="b bw" style="font-size:11px;padding:5px 9px" onclick="sim.inspectScafftag&&sim.inspectScafftag()" title="Pull out Scafftag card">📋 Scafftag Card</button>
+        <button class="b bw" style="font-size:11px;padding:5px 9px" onclick="sim.toggleClimb&&sim.toggleClimb()" title="Climb or descend ladder">🪜 Climb / Descend</button>
+        <button class="b bw" style="font-size:11px;padding:5px 9px" onclick="window.conFixNow&&window.conFixNow()" title="Torque bolts at height">🔩 Torque Bolts (E)</button>
+        <button class="b bw" style="font-size:11px;padding:5px 9px;background:#451a1a;border-color:#ef4444" onclick="sim.dropTest&&sim.dropTest()" title="Simulate falling tool gravity impact">🔨 Test Dropped Tool (T)</button>
       </div>
     `;
 
@@ -423,6 +749,16 @@
       </div>
     `;
 
+    // Interactive 3D World Simulation Actions Toolbar
+    h += `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+        <button class="b bw" style="font-size:11px;padding:5px 9px" onclick="sim.toggleGuard&&sim.toggleGuard()" title="Open/close interlock guard">🛡️ Safety Guard (G)</button>
+        <button class="b bw" style="font-size:11px;padding:5px 9px" onclick="sim.sweepBed&&sim.sweepBed()" title="Sweep metal turnings with brush">🧹 Sweep Swarf</button>
+        <button class="b bw" style="font-size:11px;padding:5px 9px" onclick="window.macFeedNow&&window.macFeedNow()" title="Feed stock with push stick">🪵 Push Stick (E)</button>
+        <button class="b bw" style="font-size:11px;padding:5px 9px;background:#451a1a;border-color:#ef4444" onclick="sim.slapEstop&&sim.slapEstop()" title="Palm slap mushroom button">🛑 Slap E-Stop</button>
+      </div>
+    `;
+
     h += `<div class="hud-seq-list">`;
     if (activeStep > 0) {
       h += `<div class="hud-seq-item done">✔ Step ${activeStep}. ${MSTEPS[activeStep - 1]}</div>`;
@@ -469,7 +805,7 @@
         </ul>
         <h3>Required sequence</h3>
         <ol>${CSTEPS.map(s => `<li>${s}</li>`).join('')}</ol>
-        <p class="m">Controls: drag to look · W A S D to move · click objects · E = tool / fix · 💡 Hint shows next step · 🧰 Objects lists equipment.</p>
+        <p class="m">Controls: drag to look · W A S D to move · click objects · E = torque tool · T = test dropped tool · 💡 Hint shows next step · 🧰 Objects lists equipment.</p>
         <button class="b" onclick="startCon()" style="font-size:15px;padding:12px 24px">🏗️ Enter Construction Site</button>
       </div>
     </div>
@@ -480,18 +816,18 @@
       <h1>⚙️ Machine Operation — Introduction</h1>
       <div class="c">
         <h3>Task</h3>
-        <p><b>Verify machine interlock guards, perform pre-operational Emergency Stop trip tests, clear swarf with a bench brush, start spindle, feed material using a push stick, wait for full spin-down, and apply LOTO lockout.</b></p>
+        <p><b>Inspect heavy metalworking lathe, close and latch interlock guard, test palm Emergency Stop, clear metal swarf using bench brush, start spindle, feed material using push stick, and apply Lockout/Tagout (LOTO).</b></p>
         <h3>Safety instructions</h3>
         <ul>
-          <li>Simulated educational environment — complies with OSHA 1910.212 &amp; 1910.147 (LOTO).</li>
-          <li>Never wear loose clothing, ties, or dangling jewelry near spinning chucks.</li>
-          <li>Never bypass machine interlocks; never run machinery with chuck guards open.</li>
-          <li>Never clear razor-sharp metal turnings with bare hands; always use a dedicated machine brush.</li>
+          <li>Simulated educational environment — complies with OSHA 1910.212 &amp; 1910.147.</li>
+          <li>Never wear loose clothing, gloves, ties, or neck chains near rotating spindles.</li>
+          <li>Never operate without the polycarbonate interlock guard latched shut.</li>
+          <li>Always test the Emergency Stop button before starting any machining operation.</li>
           <li>Always apply your personal padlock and danger tag before servicing or leaving equipment.</li>
         </ul>
         <h3>Required sequence</h3>
         <ol>${MSTEPS.map(s => `<li>${s}</li>`).join('')}</ol>
-        <p class="m">Controls: drag to look · W A S D to move · click objects · E = feed tool · 💡 Hint shows next step · 🧰 Objects lists equipment.</p>
+        <p class="m">Controls: drag to look · W A S D to move · click objects · E = feed push stick · G = toggle guard · 💡 Hint shows next step · 🧰 Objects lists equipment.</p>
         <button class="b" onclick="startMac()" style="font-size:15px;padding:12px 24px">⚙️ Enter Machine Workshop</button>
       </div>
     </div>
@@ -509,7 +845,7 @@
     hudC();
     if (st.dsc && st.phase === 'basic') {
       st.phase = 'choice';
-      if (typeof beep === 'function') beep(660, 0.25);
+      AudioFX.tone(660, 0.25);
       const m = document.getElementById('md');
       if (m) {
         m.style.display = 'flex';
@@ -523,7 +859,7 @@
     hudM();
     if (st.lk && st.phase === 'basic') {
       st.phase = 'choice';
-      if (typeof beep === 'function') beep(660, 0.25);
+      AudioFX.tone(660, 0.25);
       const m = document.getElementById('md');
       if (m) {
         m.style.display = 'flex';
@@ -576,7 +912,7 @@
     R.shadowMap.type = THREE.PCFSoftShadowMap;
     R.xr.enabled = true;
     sc.background = new THREE.Color(0x1a2634); // Daylight industrial sky
-    sc.fog = new THREE.Fog(0x1a2634, 18, 45);
+    sc.fog = new THREE.Fog(0x1a2634, 18, 48);
 
     const M = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.65, metalness: 0.25 }, o || {}));
     const Bc = c => new THREE.MeshBasicMaterial({ color: c });
@@ -597,7 +933,7 @@
     const lab = (t, x, y, z) => {
       const c = document.createElement('canvas'); c.width = 384; c.height = 96;
       const g = c.getContext('2d');
-      g.fillStyle = 'rgba(8,14,22,0.9)';
+      g.fillStyle = 'rgba(8,14,22,0.92)';
       g.beginPath(); g.moveTo(20,4); g.lineTo(364,4); g.quadraticCurveTo(380,4,380,20); g.lineTo(380,76); g.quadraticCurveTo(380,92,364,92); g.lineTo(20,92); g.quadraticCurveTo(4,92,4,76); g.lineTo(4,20); g.quadraticCurveTo(4,4,20,4); g.fill();
       g.strokeStyle = 'rgba(56,189,248,0.85)'; g.lineWidth = 3; g.stroke();
       g.fillStyle = '#fff'; g.font = 'bold 36px -apple-system,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -641,13 +977,17 @@
     };
 
     const mark = g => {
+      if (!g) return;
       g.userData.sel = 1;
       g.traverse(c => { if (c.material && c.material.emissive) c.material.emissive.setHex(0x1a7f3c); });
     };
 
-    const hl = (g, on) => g.traverse(c => {
-      if (c.material && c.material.emissive) c.material.emissive.setHex(on ? 0x665500 : (g.userData.sel ? 0x1a7f3c : 0));
-    });
+    const hl = (g, on) => {
+      if (!g) return;
+      g.traverse(c => {
+        if (c.material && c.material.emissive) c.material.emissive.setHex(on ? 0x665500 : (g.userData.sel ? 0x1a7f3c : 0));
+      });
+    };
 
     const NM = {
       sign1: 'Overhead Crane Hazard Sign',
@@ -678,6 +1018,18 @@
       l.position.set(p[0], 5, p[1]);
       sc.add(l);
     });
+
+    // Emergency Flashing Amber Strobes on scaffolding tower top
+    const strobeL1 = new THREE.PointLight(0xf59e0b, 0, 15);
+    strobeL1.position.set(-1.6, 5.5, -2.3);
+    sc.add(strobeL1);
+    const strobeL2 = new THREE.PointLight(0xf59e0b, 0, 15);
+    strobeL2.position.set(1.6, 5.5, -2.3);
+    sc.add(strobeL2);
+
+    // Strobe Beacon mesh caps
+    const beaconMesh1 = cy(sc, 0.08, 0.16, 0xf59e0b, -1.6, 5.45, -2.3);
+    const beaconMesh2 = cy(sc, 0.08, 0.16, 0xf59e0b, 1.6, 5.45, -2.3);
 
     // ---------- GROUND & SITE FOUNDATIONS
     const groundT = tex(1024, 1024, (g, w, h) => {
@@ -721,8 +1073,8 @@
     // 4 Vertical Standards (tubular steel)
     const stds = [[-1.6, -1.2], [1.6, -1.2], [-1.6, 1.2], [1.6, 1.2]];
     stds.forEach(p => {
-      cy(Scaf, 0.05, 5.4, 0x94a3b8, p[0], 2.7, p[1]); // Standard
-      bx(Scaf, 0.3, 0.04, 0.3, 0x334155, p[0], 0.02, p[1]); // Base jack / plate
+      cy(Scaf, 0.05, 5.4, 0x94a3b8, p[0], 2.7, p[1]);
+      bx(Scaf, 0.3, 0.04, 0.3, 0x334155, p[0], 0.02, p[1]);
     });
 
     // Horizontal Ledgers & Transoms at Tier 1 (1.8m) & Tier 2 (3.6m)
@@ -763,13 +1115,23 @@
 
     // ---------- INTERACTIVE SCAFFOLD OBJECTS
     // 1. Scafftag Inspection Holder at ladder base
-    ob('ins', ladX, 1.1, -2.1, g => {
+    const tagCard = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.24, 0.01), M(0xffffff));
+    tagCard.position.set(0, 0, 0.025);
+    const insG = ob('ins', ladX, 1.1, -2.1, g => {
       bx(g, 0.18, 0.3, 0.04, 0x15803d); // Green tag holder
-      bx(g, 0.14, 0.24, 0.01, 0xffffff, 0, 0, 0.025); // Inspection record insert
+      g.add(tagCard);
       cy(g, 0.015, 0.08, 0x0f172a, 0, 0.14, 0.02);
     }, 0.6, 'Scafftag');
 
-    // 2. Drop Zone Barricade System (Cones & Barricade Trestle)
+    // 2. Drop Zone Barricade System (Cones & Dynamic Caution Tape)
+    const tapeMesh = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.12), new THREE.MeshBasicMaterial({
+      color: 0xfacc15,
+      side: THREE.DoubleSide
+    }));
+    tapeMesh.position.set(0, 0.72, -1.5);
+    tapeMesh.visible = false;
+    sc.add(tapeMesh);
+
     const BarG = ob('bar', 0, 0.45, -1.5, g => {
       // Traffic cones
       [-1.8, 1.8].forEach(cx => {
@@ -784,36 +1146,119 @@
       cy(g, 0.03, 0.8, 0x334155, 1.6, -0.1, 0);
     }, 1.4, 'Barricade');
 
-    // 3. Overhead Lifeline & Fall Arrest Anchor Clamp (`anc`)
+    // 3. Overhead Lifeline Static Steel Cable & Sliding Trolley
+    const trolleyGroup = new THREE.Group();
+    trolleyGroup.position.set(0, 4.9, -3.5);
+    sc.add(trolleyGroup);
+    // Overhead steel cable
+    const staticCable = cy(sc, 0.012, 4.2, 0xd4d4d8, 0, 4.9, -3.5);
+    staticCable.rotation.z = PI / 2;
+    // Trolley carriage
+    bx(trolleyGroup, 0.15, 0.12, 0.15, 0xf59e0b, 0, -0.05, 0);
+    add(trolleyGroup, new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.015, 8, 20), M(0xffffff, { metalness: 0.8 })), 0, -0.18, 0);
+    // Shock absorber energy pack
+    const shockPack = bx(trolleyGroup, 0.08, 0.2, 0.05, 0xdc2626, 0, -0.32, 0);
+
+    // Interactive Anchor Target
     const ancG = ob('anc', 0, 4.9, -3.5, g => {
-      // Steel static cable
-      cy(g, 0.015, 4.0, 0xd4d4d8, 0, 0, 0).rotation.z = PI / 2;
-      // D-Ring Anchor Trolley
-      bx(g, 0.15, 0.12, 0.15, 0xf59e0b, 0, -0.05, 0);
-      // Heavy Steel D-Ring
-      add(g, new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.015, 8, 20), M(0xffffff, { metalness: 0.8 })), 0, -0.18, 0);
-      // Fall arrest shock-pack pack
-      bx(g, 0.08, 0.2, 0.05, 0xdc2626, 0, -0.32, 0);
+      // Invisible anchor hitbox
     }, 0.8, 'Lifeline Anchor');
 
-    // 4. Structural Fixing Joint at Height (`fix`)
+    // Dynamic 3D Physical Safety Lanyard Rope connecting Trolley to Worker
+    const lanyardGeom = new THREE.BufferGeometry();
+    const lanyardPts = new Float32Array(16 * 3);
+    lanyardGeom.setAttribute('position', new THREE.BufferAttribute(lanyardPts, 3));
+    const lanyardLine = new THREE.Line(lanyardGeom, new THREE.LineBasicMaterial({ color: 0xfacc15, linewidth: 3 }));
+    lanyardLine.visible = false;
+    sc.add(lanyardLine);
+
+    // 4. Structural Fixing Joint at Height (`fix`) with animated hex bolts & torque dial
+    const hexBolts = [];
     const fixG = ob('fix', 0.8, 3.9, -3.5, g => {
       // Steel I-beam connector plate
       bx(g, 0.5, 0.35, 0.12, 0x475569, 0, 0, 0);
-      // High-strength bolts with washers
+      // 4 High-strength hexagonal structural bolts
       [[-0.15, -0.08], [0.15, -0.08], [-0.15, 0.08], [0.15, 0.08]].forEach(bp => {
-        cy(g, 0.035, 0.08, 0xfacc15, bp[0], bp[1], 0.07).rotation.x = PI / 2;
+        const hb = cy(g, 0.035, 0.08, 0xfacc15, bp[0], bp[1], 0.07, 0.035);
+        hb.rotation.x = PI / 2;
+        hexBolts.push(hb);
       });
-      // Structural bracket flange
       bx(g, 0.1, 0.35, 0.3, 0x334155, 0, 0, -0.15);
     }, 0.9, 'Beam Fixing');
 
+    // Floating 3D Torque Readout Gauge Sprite
+    const torqueCanvas = document.createElement('canvas'); torqueCanvas.width = 384; torqueCanvas.height = 128;
+    const torqueCtx = torqueCanvas.getContext('2d');
+    const updateTorqueGauge = (nm, ok) => {
+      torqueCtx.fillStyle = 'rgba(15,23,42,0.95)'; torqueCtx.fillRect(0, 0, 384, 128);
+      torqueCtx.strokeStyle = ok ? '#22c55e' : '#f59e0b'; torqueCtx.lineWidth = 6; torqueCtx.strokeRect(4, 4, 376, 120);
+      torqueCtx.fillStyle = '#fff'; torqueCtx.font = 'bold 22px sans-serif'; torqueCtx.textAlign = 'center';
+      torqueCtx.fillText('TORQUE WRENCH CALIBRATION', 192, 34);
+      torqueCtx.fillStyle = ok ? '#22c55e' : '#facc15'; torqueCtx.font = 'bold 44px monospace';
+      torqueCtx.fillText(`${nm} Nm`, 192, 85);
+      if (ok) {
+        torqueCtx.fillStyle = '#22c55e'; torqueCtx.font = 'bold 16px sans-serif';
+        torqueCtx.fillText('✓ WITNESSED (OSHA 1926.756)', 192, 114);
+      }
+    };
+    updateTorqueGauge(0, false);
+    const torqueTex = new THREE.CanvasTexture(torqueCanvas);
+    const torqueSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: torqueTex, transparent: true }));
+    torqueSprite.position.set(0.8, 4.45, -3.5);
+    torqueSprite.scale.set(0.7, 0.24, 1);
+    torqueSprite.visible = false;
+    sc.add(torqueSprite);
+
+    // Friction Spark Particles for bolt torquing
+    const sparkCount = 35;
+    const sparkPos = new Float32Array(sparkCount * 3);
+    const sparkVel = [];
+    for (let i = 0; i < sparkCount; i++) {
+      sparkPos[i * 3] = 0.8; sparkPos[i * 3 + 1] = 3.9; sparkPos[i * 3 + 2] = -3.4;
+      sparkVel.push({ x: 0, y: 0, z: 0, life: 0 });
+    }
+    const sparkGeom = new THREE.BufferGeometry();
+    sparkGeom.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+    const sparkPoints = new THREE.Points(sparkGeom, new THREE.PointsMaterial({
+      color: 0xffb703,
+      size: 0.05,
+      transparent: true,
+      blending: THREE.AdditiveBlending
+    }));
+    sparkPoints.visible = false;
+    sc.add(sparkPoints);
+
     // 5. Ladder Descent & Tool Pouch (`dsc`)
     ob('dsc', ladX, 3.4, -2.1, g => {
-      bx(g, 0.28, 0.3, 0.18, 0x854d0e); // Tool pouch
-      cy(g, 0.02, 0.35, 0x9ca3af, 0.1, 0.05, 0.1); // Ratchet wrench in pouch
-      bx(g, 0.05, 0.12, 0.05, 0x22c55e, -0.08, 0.08, 0.05); // Level
+      bx(g, 0.28, 0.3, 0.18, 0x854d0e);
+      cy(g, 0.02, 0.35, 0x9ca3af, 0.1, 0.05, 0.1);
+      bx(g, 0.05, 0.12, 0.05, 0x22c55e, -0.08, 0.08, 0.05);
     }, 0.8, 'Tool Pouch');
+
+    // 6. Dropped Tool Gravity Physics Simulation Object (`dropTool`)
+    const droppedWrench = new THREE.Group();
+    cy(droppedWrench, 0.016, 0.38, 0x94a3b8, 0, 0, 0); // Steel handle
+    bx(droppedWrench, 0.08, 0.08, 0.04, 0x475569, 0, 0.19, 0); // Adjustable jaw
+    bx(droppedWrench, 0.08, 0.08, 0.04, 0x475569, 0, -0.19, 0);
+    droppedWrench.position.set(0.5, 3.6, -2.2);
+    droppedWrench.visible = false;
+    sc.add(droppedWrench);
+
+    let dropPhysics = { active: false, y: 3.6, vy: 0, rx: 0, rz: 0 };
+
+    // Impact Dust Puff Particles
+    const dustCount = 20;
+    const dustPos = new Float32Array(dustCount * 3);
+    const dustGeom = new THREE.BufferGeometry();
+    dustGeom.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+    const dustPoints = new THREE.Points(dustGeom, new THREE.PointsMaterial({
+      color: 0x9ca3af,
+      size: 0.12,
+      transparent: true,
+      opacity: 0.7
+    }));
+    dustPoints.visible = false;
+    sc.add(dustPoints);
 
     // ---------- PPE BENCH
     bx(sc, 2.4, 0.08, 0.8, 0x5b4636, -3.5, 0.9, 2);
@@ -823,31 +1268,30 @@
 
     ob('helmet', -4.2, 1.15, 2, g => {
       add(g, new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 12, 0, 2 * PI, 0, PI * 0.6), M(0xfacc15, { roughness: 0.3 })), 0, 0, 0);
-      bx(g, 0.34, 0.03, 0.06, 0xca8a04, 0, 0, 0.2); // Brim
-      cy(g, 0.015, 0.24, 0x0f172a, 0, -0.1, 0.05); // Chin strap
+      bx(g, 0.34, 0.03, 0.06, 0xca8a04, 0, 0, 0.2);
+      cy(g, 0.015, 0.24, 0x0f172a, 0, -0.1, 0.05);
     }, 0.6, 'Hard Hat');
 
     ob('vest', -3.5, 1.0, 2, g => {
-      bx(g, 0.45, 0.04, 0.55, 0xf97316); // High-vis neon orange
-      bx(g, 0.06, 0.05, 0.55, 0xe2e8f0, -0.12, 0.005, 0); // Reflective silver tape
+      bx(g, 0.45, 0.04, 0.55, 0xf97316);
+      bx(g, 0.06, 0.05, 0.55, 0xe2e8f0, -0.12, 0.005, 0);
       bx(g, 0.06, 0.05, 0.55, 0xe2e8f0, 0.12, 0.005, 0);
     }, 0.6, 'Hi-Vis Vest');
 
     ob('harness', -2.8, 1.02, 2, g => {
-      // Body webbing harness straps
-      bx(g, 0.42, 0.05, 0.5, 0x0284c7); // Blue webbing
-      bx(g, 0.06, 0.06, 0.5, 0xfacc15, 0, 0.005, 0); // Chest strap
-      add(g, new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 16), M(0xffffff, { metalness: 0.8 })), 0, 0.04, -0.22); // Dorsal D-ring
-      cy(g, 0.02, 0.45, 0xdc2626, 0.12, 0.02, 0.15).rotation.z = PI / 2; // Lanyard
+      bx(g, 0.42, 0.05, 0.5, 0x0284c7);
+      bx(g, 0.06, 0.06, 0.5, 0xfacc15, 0, 0.005, 0);
+      add(g, new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 16), M(0xffffff, { metalness: 0.8 })), 0, 0.04, -0.22);
+      cy(g, 0.02, 0.45, 0xdc2626, 0.12, 0.02, 0.15).rotation.z = PI / 2;
     }, 0.7, 'Safety Harness');
 
     // Site Emergency Air Horn
     ob('horn', 6.5, 1.6, -7.8, g => {
       bx(g, 0.22, 0.32, 0.1, 0xdc2626);
-      cy(g, 0.06, 0.2, 0xfacc15, 0, 0.18, 0.08, 0.02).rotation.x = PI / 2; // Horn cone
+      cy(g, 0.06, 0.2, 0xfacc15, 0, 0.18, 0.08, 0.02).rotation.x = PI / 2;
     }, 0.6, 'Emergency Horn');
 
-    // ---------- POSTERS & SIGNS
+    // Posters
     post('sign1', -4.5, 3.2, -7.85, 0, 'OVERHEAD HAZARD', 'CRANE / FALLING OBJECTS', '#eab308', '#000000');
     post('sign2', 4.5, 3.2, -7.85, 0, 'FALL PROTECTION', '100% TIE-OFF REQUIRED', '#0284c7', '#ffffff');
     post(0, -8.85, 3.2, -1.0, PI / 2, 'SCAFFOLD SAFETY', 'CHECK SCAFFTAG DAILY', '#15803d', '#ffffff');
@@ -874,23 +1318,217 @@
 
     // Held tool: Ratchet / Torque Wrench
     const heldTool = new THREE.Group();
-    cy(heldTool, 0.016, 0.32, 0x1e293b, 0, 0, 0).rotation.x = PI / 2;
-    bx(heldTool, 0.06, 0.05, 0.1, 0x94a3b8, 0, 0.02, -0.16);
-    cy(heldTool, 0.03, 0.06, 0xd4d4d8, 0, 0.06, -0.16);
+    cy(heldTool, 0.016, 0.35, 0x1e293b, 0, 0, 0).rotation.x = PI / 2;
+    bx(heldTool, 0.06, 0.05, 0.1, 0x94a3b8, 0, 0.02, -0.18);
+    cy(heldTool, 0.035, 0.07, 0xd4d4d8, 0, 0.06, -0.18);
     heldTool.position.set(0, 0.02, -0.1);
     heldTool.visible = false;
     hR.add(heldTool);
 
-    // Interaction Logic
+    // Interactive Proximity Reticle UI Element
+    let reticleEl = document.getElementById('sim-reticle');
+    if (!reticleEl && sw) {
+      reticleEl = document.createElement('div');
+      reticleEl.id = 'sim-reticle';
+      reticleEl.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:15;display:flex;align-items:center;justify-content:center;';
+      reticleEl.innerHTML = `
+        <div id="ret-ring" style="width:24px;height:24px;border:2px solid rgba(56,189,248,0.7);border-radius:50%;transition:transform 0.15s ease, border-color 0.15s ease;"></div>
+        <div id="ret-dot" style="position:absolute;width:4px;height:4px;background:#38bdf8;border-radius:50%;"></div>
+        <div id="ret-badge" style="position:absolute;top:30px;background:rgba(15,23,42,0.92);border:1px solid #38bdf8;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;display:none;"></div>
+      `;
+      sw.appendChild(reticleEl);
+    }
+
+    // ---------------------------------------------------------------------
+    // REAL 3D ANIMATION SYSTEMS: LADDER CLIMBING & BOLT TORQUING
+    // ---------------------------------------------------------------------
+    let climbAnimation = null;
+    me.climbLadder = function(direction, cb) {
+      if (climbAnimation) return;
+      const t0 = performance.now();
+      const startPos = cam.position.clone();
+      const targetPos = direction > 0
+        ? new THREE.Vector3(0, 3.4, -3.2) // Platform top
+        : new THREE.Vector3(0, 1.6, 3.5);  // Ground level
+
+      climbAnimation = {
+        t0,
+        dur: 2400,
+        startPos,
+        targetPos,
+        direction,
+        cb,
+        stepsTaken: 0
+      };
+      if (typeof tip === 'function') {
+        tip(direction > 0 ? '🪜 Ascending scaffolding ladder with 3 points of contact...' : '🪜 Descending ladder safely facing the rungs...');
+      }
+    };
+
+    me.toggleClimb = function() {
+      if (cam.position.y > 2.5) {
+        me.climbLadder(-1, () => {
+          st.dsc = 1;
+          lanyardLine.visible = false;
+          heldTool.visible = false;
+          afterC();
+        });
+      } else {
+        if (!st.worn) {
+          if (typeof mist === 'function') mist('ppe', '⚠️ Safety Violation', 'Attempted to climb scaffold without full fall arrest harness.', 'Wear your PPE first.');
+          return;
+        }
+        if (!st.bar) {
+          if (typeof mist === 'function') mist('zone', '⚠️ Drop Zone Unprotected', 'Climbing scaffold before barricading ground drop zone.', 'Set up the drop zone barricade first.');
+          return;
+        }
+        me.climbLadder(1, () => {
+          st.anc = 1;
+          lanyardLine.visible = true;
+          heldTool.visible = true;
+          mark(ancG);
+          AudioFX.latch();
+          afterC();
+        });
+      }
+    };
+
+    // Scafftag Interactive Inspection Modal
+    me.inspectScafftag = function() {
+      AudioFX.tagRustle();
+      tagCard.position.y = -0.15; // Slide tag out
+      st.ins = 1;
+      mark(insG);
+
+      const oldM = document.getElementById('scafftag-modal');
+      if (oldM) oldM.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'scafftag-modal';
+      modal.style.cssText = 'position:absolute;inset:0;background:rgba(8,15,25,0.85);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:35;padding:16px;';
+      modal.innerHTML = `
+        <div style="background:#0f172a;border:2px solid #22c55e;border-radius:12px;max-width:440px;width:100%;padding:20px;color:#fff;font-family:system-ui,sans-serif;box-shadow:0 20px 40px rgba(0,0,0,0.8);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div style="background:#22c55e;color:#000;font-weight:900;font-size:14px;padding:4px 10px;border-radius:4px;">OSHA 1926.451</div>
+            <h2 style="margin:0;font-size:18px;color:#22c55e;">SCAFFTAG GREEN PERMIT</h2>
+          </div>
+          <div style="background:#1e293b;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;margin-bottom:16px;">
+            <div><b>Structure:</b> Heavy Tubular Scaffolding Tower</div>
+            <div><b>Duty Class:</b> Medium Duty (200 kg/m²) · <b>Max Load:</b> 450 kg</div>
+            <div><b>Sole Boards &amp; Base Jacks:</b> Level &amp; Bedded ✓</div>
+            <div><b>Guardrails (1.05m) &amp; Toe Boards:</b> Secured ✓</div>
+            <div><b>Bracing &amp; Ties:</b> Rigged and Clamped ✓</div>
+            <div><b>Inspected By:</b> Competent Person #8492 · Valid 7 Days</div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button class="b" style="padding:10px 20px;font-weight:700" onclick="document.getElementById('scafftag-modal').remove()">✓ Sign Off &amp; Close</button>
+          </div>
+        </div>
+      `;
+      sw.appendChild(modal);
+      if (typeof tip === 'function') tip('✅ Scafftag verified: Scaffold structure green-tagged and approved for work.');
+      afterC();
+    };
+
+    // Structural Bolt Torquing Animation
+    let torqueAnimation = null;
+    me.torqueBolts = function() {
+      if (!st.anc) {
+        if (typeof mist === 'function') mist('seq', '⚠️ Fall Hazard Violation', 'Performing work at height without being anchored to the lifeline.', 'Anchor your safety harness to the overhead cable first.');
+        return;
+      }
+      if (torqueAnimation) return;
+
+      torqueSprite.visible = true;
+      sparkPoints.visible = true;
+      torqueAnimation = {
+        stage: 0,
+        t0: performance.now(),
+        nm: 0
+      };
+
+      const strokeSequence = [
+        { nm: 65, dur: 450, sound: () => AudioFX.ratchet(false) },
+        { nm: 130, dur: 450, sound: () => AudioFX.ratchet(false) },
+        { nm: 180, dur: 550, sound: () => { AudioFX.ratchet(true); AudioFX.sparkSpray(0.3); } }
+      ];
+
+      let step = 0;
+      const doStep = () => {
+        if (step >= strokeSequence.length) {
+          torqueAnimation = null;
+          st.fix = 1;
+          mark(fixG);
+          updateTorqueGauge(180, true);
+          torqueTex.needsUpdate = true;
+          // Turn hex bolts and give blue witness mark
+          hexBolts.forEach(hb => {
+            hb.material = M(0x38bdf8, { metalness: 0.9, roughness: 0.2 });
+            hb.position.z = 0.05; // Screwed in tight
+          });
+          if (typeof tip === 'function') tip('🔩 Torqued to 180 Nm! Calibrated witness stripe applied (OSHA 1926.756).');
+          afterC();
+          return;
+        }
+
+        const s = strokeSequence[step];
+        s.sound();
+        updateTorqueGauge(s.nm, step === 2);
+        torqueTex.needsUpdate = true;
+
+        // Animate held wrench lever pump
+        hR.position.z = -0.5;
+        hR.rotation.z = 0.25;
+        setTimeout(() => {
+          hR.position.z = -0.6;
+          hR.rotation.z = 0;
+        }, 220);
+
+        // Spawn friction sparks
+        for (let i = 0; i < sparkCount; i++) {
+          sparkPos[i * 3] = 0.8 + (Math.random() - 0.5) * 0.1;
+          sparkPos[i * 3 + 1] = 3.9 + (Math.random() - 0.5) * 0.1;
+          sparkPos[i * 3 + 2] = -3.4;
+          sparkVel[i] = {
+            x: (Math.random() - 0.5) * 0.04,
+            y: (Math.random() * 0.03) + 0.01,
+            z: Math.random() * 0.03,
+            life: 1.0
+          };
+        }
+        sparkGeom.attributes.position.needsUpdate = true;
+
+        step++;
+        setTimeout(doStep, s.dur);
+      };
+      doStep();
+    };
+
+    // Dropped Tool Gravity Hazard Simulation Test
+    me.dropTest = function() {
+      droppedWrench.visible = true;
+      droppedWrench.position.set(cam.position.x * 0.6, 3.6, -2.4);
+      dropPhysics = {
+        active: true,
+        y: 3.6,
+        vy: 0,
+        rx: 0,
+        rz: 0
+      };
+      if (typeof tip === 'function') tip('⚠️ DROPPED TOOL HAZARD: Spanner falling under gravity...');
+    };
+
+    // Interaction Click Handler
     const P = id => {
       if (st.phase === 'em') {
         const E = st.em = st.em || { alarm: 0, bar: 0, out: 0, t0: Date.now() };
         if (id === 'horn') {
           E.alarm = 1;
+          AudioFX.airHorn();
           if (typeof tip === 'function') tip('🚨 Site emergency alarm sounded! All workers alerted.');
-          if (typeof beep === 'function') beep(880, 0.35);
         } else if (id === 'bar') {
           E.bar = 1;
+          AudioFX.latch();
           if (typeof tip === 'function') tip('Drop zone locked and secured.');
         }
         return hudC();
@@ -901,8 +1539,8 @@
 
       if (id === 'sign1' || id === 'sign2') {
         st.haz.add(id);
+        AudioFX.tone(440, 0.15);
         if (typeof tip === 'function') tip(id === 'sign1' ? 'OVERHEAD HAZARD: Wear hard hat; drop zone must be barricaded.' : 'FALL HAZARD: Full-body harness & certified anchor required above 6ft.');
-        if (typeof beep === 'function') beep(440, 0.15);
         return afterC();
       }
 
@@ -910,8 +1548,8 @@
         if (st.worn) return tip && tip('PPE already equipped.');
         st.pick.add(id);
         mark(g);
+        AudioFX.tone(520, 0.1);
         if (typeof tip === 'function') tip(NM[id] + ' ready (' + st.pick.size + '/3).');
-        if (typeof beep === 'function') beep(520, 0.1);
         return afterC();
       }
 
@@ -921,10 +1559,7 @@
       }
 
       if (id === 'ins') {
-        st.ins = 1;
-        mark(g);
-        if (typeof tip === 'function') tip('✅ Scafftag verified: Scaffold inspected and structurally sound (OSHA Subpart L).');
-        if (typeof beep === 'function') beep(600, 0.15);
+        me.inspectScafftag();
       } else if (id === 'bar') {
         if (!st.ins) {
           if (typeof mist === 'function') mist('seq', '⚠️ Unsafe Sequence', 'Barricade established before scaffolding was inspected.', 'Verify Scafftag at ladder base first.');
@@ -932,43 +1567,24 @@
         }
         st.bar = 1;
         mark(g);
-        if (typeof tip === 'function') tip('🚧 Drop zone barricaded: perimeter cleared of pedestrian ground traffic.');
-        if (typeof beep === 'function') beep(620, 0.15);
+        tapeMesh.visible = true; // Expand caution tape
+        AudioFX.latch();
+        if (typeof tip === 'function') tip('🚧 Drop zone barricaded: yellow caution tape secured across perimeter.');
+        afterC();
       } else if (id === 'anc') {
-        if (!st.bar) {
-          if (typeof mist === 'function') mist('zone', '⚠️ Drop Zone Unprotected', 'Climbing scaffold before barricading ground drop zone.', 'Set up the drop zone barricade first.');
-          return;
-        }
-        st.anc = 1;
-        mark(g);
-        heldTool.visible = true;
-        // Smoothly glide camera up onto the scaffold platform
-        if (me.glide) me.glide(0, 3.2, 0, -0.15);
-        if (typeof tip === 'function') tip('⚓ 100% Tie-Off Verified: Double-locking snap hook secured to overhead lifeline.');
-        if (typeof beep === 'function') beep(700, 0.2);
+        me.toggleClimb();
       } else if (id === 'fix') {
-        if (!st.anc) {
-          if (typeof mist === 'function') mist('seq', '⚠️ Fall Hazard Violation', 'Performing work at height without being anchored to the lifeline.', 'Clip your safety harness to the anchor point before performing work.');
-          return;
-        }
-        st.fix = 1;
-        mark(g);
-        if (typeof tip === 'function') tip('🔩 Structural joint aligned: bolts torqued to 180 Nm with ratchet wrench.');
-        if (typeof beep === 'function') beep(750, 0.2);
+        me.torqueBolts();
       } else if (id === 'dsc') {
         if (!st.fix) {
-          if (typeof tip === 'function') tip('Complete the structural fixing before clearing tools.');
+          if (typeof tip === 'function') tip('Complete the structural fixing before descending.');
           return;
         }
-        st.dsc = 1;
-        heldTool.visible = false;
-        // Glide camera back to ground level
-        if (me.glide) me.glide(0, 5.0, 0, 0);
-        if (typeof tip === 'function') tip('⬇️ Tools tethered and descended safely. Work area verified 100% safe.');
-        if (typeof beep === 'function') beep(800, 0.25);
+        me.toggleClimb();
+      } else if (id === 'horn') {
+        AudioFX.airHorn();
+        if (typeof tip === 'function') tip('🚨 Site Air Horn tested: 120 dB acoustic alarm broadcast.');
       }
-
-      afterC();
     };
 
     me.pick = P;
@@ -982,8 +1598,8 @@
       });
       st.worn = 1;
       hand.visible = true;
+      AudioFX.tone(880, 0.2);
       if (typeof tip === 'function') tip('🪢 PPE Equipped: Hard hat chin strap secured, fall harness fitted.');
-      if (typeof beep === 'function') beep(880, 0.2);
       afterC();
     };
 
@@ -992,26 +1608,14 @@
       st.phase = 'em';
       st.em = { alarm: 0, bar: 0, out: 0, t0: Date.now() };
       const emv = document.getElementById('emv'); if (emv) emv.classList.add('on');
+      AudioFX.airHorn();
       if (typeof tip === 'function') tip('🚨 SITE EMERGENCY! Worker fall or dropped object detected. Sound the horn!');
-      if (typeof beep === 'function') beep(880, 0.35);
       hudC();
     };
 
-    // Camera Glide
+    // Camera Controls & Drag-Look
     let yaw = 0, pit = 0, dn = null, hov = null;
-    me.glide = (x, z, ty, tp) => {
-      const x0 = cam.position.x, z0 = cam.position.z, t0 = performance.now();
-      const targetY = z < 0 ? 3.6 : 1.6;
-      const y0 = cam.position.y;
-      (function f() {
-        const u = Math.min(1, (performance.now() - t0) / 1000);
-        const e = u * u * (3 - 2 * u);
-        cam.position.x = x0 + (x - x0) * e;
-        cam.position.z = z0 + (z - z0) * e;
-        cam.position.y = y0 + (targetY - y0) * e;
-        if (u < 1 && me.run) requestAnimationFrame(f);
-      })();
-    };
+    let walkDist = 0, lastPos = cam.position.clone();
 
     // Pointer Events
     const rc = new THREE.Raycaster();
@@ -1066,6 +1670,15 @@
       dn = null;
     };
 
+    // Keyboard Shortcuts: E = tool, T = dropped tool test
+    const keyHandler = e => {
+      if (e.target.tagName === 'INPUT') return;
+      if (e.key.toLowerCase() === 't' && me.run) {
+        me.dropTest();
+      }
+    };
+    window.addEventListener('keydown', keyHandler);
+
     // Responsive Canvas
     const rs = () => {
       if (!sw.clientWidth) return;
@@ -1076,23 +1689,171 @@
     rs();
     window.onresize = () => { if (me.run) rs(); };
 
-    // Main Animation Loop
+    // ---------------------------------------------------------------------
+    // MAIN 3D SIMULATION ANIMATION LOOP
+    // ---------------------------------------------------------------------
     let fl = 0;
     const loop = () => {
-      if (!me.run) { R.setAnimationLoop(null); return; }
+      if (!me.run) {
+        R.setAnimationLoop(null);
+        window.removeEventListener('keydown', keyHandler);
+        return;
+      }
       fl++;
-      const kk = window.K || {};
-      const f = (kk.w || kk.arrowup ? 1 : 0) - (kk.s || kk.arrowdown ? 1 : 0);
-      const r = (kk.d || kk.arrowright ? 1 : 0) - (kk.a || kk.arrowleft ? 1 : 0);
-      const sp = 0.08;
+      const s = (typeof st !== 'undefined' && st ? st : window.st);
 
-      cam.position.x = Math.max(-8, Math.min(8, cam.position.x + (-Math.sin(yaw) * f + Math.cos(yaw) * r) * sp));
-      cam.position.z = Math.max(-7, Math.min(7, cam.position.z + (-Math.cos(yaw) * f - Math.sin(yaw) * r) * sp));
+      // Handle climbing animation interpolation
+      if (climbAnimation) {
+        const elapsed = performance.now() - climbAnimation.t0;
+        const u = Math.min(1, elapsed / climbAnimation.dur);
+        const ease = u * u * (3 - 2 * u);
+        cam.position.lerpVectors(climbAnimation.startPos, climbAnimation.targetPos, ease);
+
+        // Climbing vertical sway and rung audio
+        const currentStep = Math.floor(u * 8);
+        if (currentStep > climbAnimation.stepsTaken) {
+          climbAnimation.stepsTaken = currentStep;
+          AudioFX.step('rung');
+          // Alternating hand reach
+          if (currentStep % 2 === 0) {
+            hL.position.y = -0.15; hR.position.y = -0.3;
+          } else {
+            hR.position.y = -0.15; hL.position.y = -0.3;
+          }
+        }
+
+        if (u >= 1) {
+          const cb = climbAnimation.cb;
+          climbAnimation = null;
+          hL.position.y = -0.3; hR.position.y = -0.3;
+          AudioFX.step(cam.position.y > 2.5 ? 'wood' : 'concrete');
+          if (cb) cb();
+        }
+      } else {
+        // Normal Walking Movement (WASD / Arrows)
+        const kk = window.K || {};
+        const f = (kk.w || kk.arrowup ? 1 : 0) - (kk.s || kk.arrowdown ? 1 : 0);
+        const r = (kk.d || kk.arrowright ? 1 : 0) - (kk.a || kk.arrowleft ? 1 : 0);
+        const sp = 0.08;
+
+        if (f !== 0 || r !== 0) {
+          const dx = (-Math.sin(yaw) * f + Math.cos(yaw) * r) * sp;
+          const dz = (-Math.cos(yaw) * f - Math.sin(yaw) * r) * sp;
+
+          // If on platform, keep on platform deck bounds
+          if (cam.position.y > 2.5) {
+            cam.position.x = Math.max(-1.45, Math.min(1.45, cam.position.x + dx));
+            cam.position.z = Math.max(-4.4, Math.min(-2.4, cam.position.z + dz));
+          } else {
+            cam.position.x = Math.max(-8, Math.min(8, cam.position.x + dx));
+            cam.position.z = Math.max(-7, Math.min(7, cam.position.z + dz));
+          }
+
+          // Accumulate walk distance for surface-aware footstep audio
+          const stepDist = Math.hypot(dx, dz);
+          walkDist += stepDist;
+          if (walkDist > 0.65) {
+            walkDist = 0;
+            AudioFX.step(cam.position.y > 2.5 ? 'wood' : 'concrete');
+          }
+
+          // Subtle head bob
+          const baseHeight = cam.position.y > 2.5 ? 3.4 : 1.6;
+          cam.position.y = baseHeight + Math.sin(fl * 0.3) * 0.02;
+        }
+      }
+
       cam.rotation.set(pit, yaw, 0);
 
-      // Emergency muster evacuation check
-      const s = (typeof st !== 'undefined' && st ? st : window.st);
+      // -------------------------------------------------------------------
+      // DYNAMIC 3D LIFELINE LANYARD TENSION PHYSICS
+      // -------------------------------------------------------------------
+      if (s && s.anc) {
+        // Trolley slides along overhead wire to track worker's X
+        const targetTrolleyX = Math.max(-1.8, Math.min(1.8, cam.position.x));
+        trolleyGroup.position.x += (targetTrolleyX - trolleyGroup.position.x) * 0.12;
+
+        lanyardLine.visible = true;
+        const pArr = lanyardGeom.attributes.position.array;
+        const startX = trolleyGroup.position.x, startY = 4.75, startZ = -3.5;
+        const endX = cam.position.x, endY = cam.position.y - 0.2, endZ = cam.position.z + 0.1;
+        const dist = Math.hypot(endX - startX, endZ - startZ);
+        const sag = Math.max(0.04, 0.35 - dist * 0.14);
+
+        for (let i = 0; i < 16; i++) {
+          const u = i / 15;
+          const px = startX + (endX - startX) * u;
+          const pz = startZ + (endZ - startZ) * u;
+          const py = startY + (endY - startY) * u - Math.sin(u * PI) * sag;
+          pArr[i * 3] = px; pArr[i * 3 + 1] = py; pArr[i * 3 + 2] = pz;
+        }
+        lanyardGeom.attributes.position.needsUpdate = true;
+      } else {
+        lanyardLine.visible = false;
+      }
+
+      // -------------------------------------------------------------------
+      // DROPPED TOOL GRAVITY HAZARD PHYSICS
+      // -------------------------------------------------------------------
+      if (dropPhysics.active) {
+        dropPhysics.vy += 9.8 * 0.016; // g = 9.8 m/s^2
+        dropPhysics.y -= dropPhysics.vy * 0.016;
+        droppedWrench.position.y = dropPhysics.y;
+        droppedWrench.rotation.x += 0.25;
+        droppedWrench.rotation.z += 0.18;
+
+        if (dropPhysics.y <= 0.08) {
+          dropPhysics.active = false;
+          droppedWrench.position.y = 0.05;
+          droppedWrench.rotation.set(0, rnd() * PI, PI / 2);
+          AudioFX.toolCrash();
+
+          // Spawn dust puff particles
+          dustPoints.visible = true;
+          const dArr = dustGeom.attributes.position.array;
+          for (let i = 0; i < dustCount; i++) {
+            dArr[i * 3] = droppedWrench.position.x + (rnd() - 0.5) * 0.4;
+            dArr[i * 3 + 1] = 0.06 + rnd() * 0.25;
+            dArr[i * 3 + 2] = droppedWrench.position.z + (rnd() - 0.5) * 0.4;
+          }
+          dustGeom.attributes.position.needsUpdate = true;
+          setTimeout(() => { dustPoints.visible = false; }, 600);
+
+          if (typeof say === 'function') {
+            say("Dropped object hazard demonstrated. A falling tool accelerates under gravity and strikes with lethal blunt force. Always barricade drop zones and wear hard hats.", 1);
+          }
+        }
+      }
+
+      // -------------------------------------------------------------------
+      // SPARK PARTICLES UPDATE
+      // -------------------------------------------------------------------
+      if (sparkPoints.visible) {
+        const sArr = sparkGeom.attributes.position.array;
+        for (let i = 0; i < sparkCount; i++) {
+          const v = sparkVel[i];
+          if (v && v.life > 0) {
+            v.life -= 0.04;
+            sArr[i * 3] += v.x;
+            sArr[i * 3 + 1] += v.y;
+            sArr[i * 3 + 2] += v.z;
+            v.y -= 0.003; // gravity
+          }
+        }
+        sparkGeom.attributes.position.needsUpdate = true;
+      }
+
+      // -------------------------------------------------------------------
+      // EMERGENCY STROBE BEACON FLASHING
+      // -------------------------------------------------------------------
       if (s && s.phase === 'em') {
+        const flash = Math.sin(fl * 0.35) > 0;
+        strobeL1.intensity = flash ? 3.0 : 0.2;
+        strobeL2.intensity = flash ? 3.0 : 0.2;
+        beaconMesh1.material.color.setHex(flash ? 0xf59e0b : 0x78350f);
+        beaconMesh2.material.color.setHex(flash ? 0xf59e0b : 0x78350f);
+
+        // Evacuation muster check
         const E = s.em;
         if (E && E.alarm && cam.position.x > 5 && cam.position.z > 5) {
           E.out = 1;
@@ -1104,10 +1865,39 @@
         }
       }
 
+      // -------------------------------------------------------------------
+      // IN-WORLD PROXIMITY RETICLE & FLOATING PROMPTS
+      // -------------------------------------------------------------------
+      if (reticleEl) {
+        const badge = document.getElementById('ret-badge');
+        const ring = document.getElementById('ret-ring');
+        // Find nearest interactive object
+        let closestObj = null, minDist = 999;
+        objs.forEach(o => {
+          const d = cam.position.distanceTo(o.position);
+          if (d < minDist) { minDist = d; closestObj = o; }
+        });
+
+        if (closestObj && minDist < 3.2) {
+          if (ring) { ring.style.transform = 'scale(1.35)'; ring.style.borderColor = '#22c55e'; }
+          if (badge) {
+            badge.style.display = 'block';
+            const actionPrompt = closestObj.userData.id === 'fix' ? '[E] Torque Bolts' :
+                                 closestObj.userData.id === 'anc' ? (cam.position.y > 2.5 ? '[E] Unclip / Descend' : '[E] Climb Ladder') :
+                                 `[E] ${NM[closestObj.userData.id] || closestObj.userData.id}`;
+            badge.textContent = `${actionPrompt} (${minDist.toFixed(1)}m)`;
+          }
+        } else {
+          if (ring) { ring.style.transform = 'scale(1)'; ring.style.borderColor = 'rgba(56,189,248,0.7)'; }
+          if (badge) badge.style.display = 'none';
+        }
+      }
+
       R.render(sc, cam);
     };
 
     R.setAnimationLoop(loop);
+
     if (typeof mkCoach === 'function') {
       mkCoach({
         steps: CSTEPS,
@@ -1118,10 +1908,10 @@
         kb: [
           [/ppe|helmet|vest|harness|hard\s*hat|wear/i, 'At height, 100% fall protection is non-negotiable. Inspect your harness webbings, connect the D-ring, and cinch the chinstrap on your helmet.'],
           [/scaff|tag|ladder|inspect/i, 'Always look for the green Scafftag at the ladder base before climbing. Never access a red-tagged or uninspected tower.'],
-          [/barricade|drop\s*zone|cordon|cone/i, 'Tools or material dropped from 3m can cause fatal impact injuries below. Cordon off the ground drop zone with warning barricades.'],
+          [/barricade|drop\s*zone|cordon|cone|tape/i, 'Tools or material dropped from 3m can cause fatal impact injuries below. Cordon off the ground drop zone with warning barricades.'],
           [/anchor|lifeline|clip|d-ring/i, 'Clip your lanyard snap-hook to an approved overhead anchor point before performing any elevated work.'],
-          [/torque|bolt|fix|bracket/i, 'Use the torque tool at height to secure the structural fixing plate while maintaining 3 points of contact or harness restraint.'],
-          [/descend|ladder|clear|tether/i, 'Tether all hand tools before descending. Use the ladder facing the rungs with hands free.']
+          [/torque|bolt|fix|bracket/i, 'Use the torque tool at height to secure the structural fixing plate to 180 Nm and witness-mark the connection.'],
+          [/descend|ladder|clear|tether/i, 'Tether all hand tools before descending. Use the ladder facing the rungs with 3 points of contact.']
         ],
         why: {
           ppe: 'Full PPE (hard hat, vest, safety harness) is mandatory on construction sites.',
@@ -1178,7 +1968,7 @@
     R.shadowMap.type = THREE.PCFSoftShadowMap;
     R.xr.enabled = true;
     sc.background = new THREE.Color(0x0a111a); // Machine shop ambient
-    sc.fog = new THREE.Fog(0x0a111a, 16, 40);
+    sc.fog = new THREE.Fog(0x0a111a, 16, 42);
 
     const M = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.6, metalness: 0.35 }, o || {}));
     const Bc = c => new THREE.MeshBasicMaterial({ color: c });
@@ -1199,7 +1989,7 @@
     const lab = (t, x, y, z) => {
       const c = document.createElement('canvas'); c.width = 384; c.height = 96;
       const g = c.getContext('2d');
-      g.fillStyle = 'rgba(8,14,22,0.9)';
+      g.fillStyle = 'rgba(8,14,22,0.92)';
       g.beginPath(); g.moveTo(20,4); g.lineTo(364,4); g.quadraticCurveTo(380,4,380,20); g.lineTo(380,76); g.quadraticCurveTo(380,92,364,92); g.lineTo(20,92); g.quadraticCurveTo(4,92,4,76); g.lineTo(4,20); g.quadraticCurveTo(4,4,20,4); g.fill();
       g.strokeStyle = 'rgba(56,189,248,0.85)'; g.lineWidth = 3; g.stroke();
       g.fillStyle = '#fff'; g.font = 'bold 36px -apple-system,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -1243,13 +2033,17 @@
     };
 
     const mark = g => {
+      if (!g) return;
       g.userData.sel = 1;
       g.traverse(c => { if (c.material && c.material.emissive) c.material.emissive.setHex(0x1a7f3c); });
     };
 
-    const hl = (g, on) => g.traverse(c => {
-      if (c.material && c.material.emissive) c.material.emissive.setHex(on ? 0x665500 : (g.userData.sel ? 0x1a7f3c : 0));
-    });
+    const hl = (g, on) => {
+      if (!g) return;
+      g.traverse(c => {
+        if (c.material && c.material.emissive) c.material.emissive.setHex(on ? 0x665500 : (g.userData.sel ? 0x1a7f3c : 0));
+      });
+    };
 
     const NM = {
       sign1: 'Rotating Parts Warning Sign',
@@ -1277,6 +2071,14 @@
     const workLamp = new THREE.PointLight(0xfef08a, 1.2, 7);
     workLamp.position.set(0, 2.5, -2.6);
     sc.add(workLamp);
+
+    // Headstock Emergency Warning Beacon Light
+    const beaconLight = new THREE.PointLight(0xf59e0b, 0, 14);
+    beaconLight.position.set(-1.0, 2.3, -3.0);
+    sc.add(beaconLight);
+
+    // Beacon dome mesh
+    const beaconDome = cy(sc, 0.08, 0.14, 0xf59e0b, -1.0, 2.22, -3.0);
 
     // ---------- FLOOR & WALLS
     const shopT = tex(1024, 1024, (g, w, h) => {
@@ -1307,71 +2109,104 @@
     bx(sc, 0.2, 5, 16, 0x1e293b, -8, 2.5, 0);
     bx(sc, 0.2, 5, 16, 0x1e293b, 8, 2.5, 0);
 
-    // ---------- HEAVY INDUSTRIAL LATHE & MILLING MACHINERY
+    // ---------- HEAVY INDUSTRIAL LATHE MACHINERY
     const Machine = new THREE.Group();
     Machine.position.set(0, 0, -3.0);
     sc.add(Machine);
 
     // Heavy Cast Iron Machine Bed & Legs
-    bx(Machine, 3.2, 0.7, 1.2, 0x064e3b, 0, 0.45, 0); // Industrial green cast bed
-    bx(Machine, 3.0, 0.2, 0.9, 0x334155, 0, 0.9, 0); // Ground steel slideways
-    bx(Machine, 0.6, 0.8, 1.1, 0x064e3b, -1.2, 0.4, 0); // Headstock base
-    bx(Machine, 0.6, 0.8, 1.1, 0x064e3b, 1.2, 0.4, 0); // Tailstock base
+    bx(Machine, 3.2, 0.7, 1.2, 0x064e3b, 0, 0.45, 0);
+    const slideways = bx(Machine, 3.0, 0.2, 0.9, 0x94a3b8, 0, 0.9, 0); // Steel slideways
+    bx(Machine, 0.6, 0.8, 1.1, 0x064e3b, -1.2, 0.4, 0);
+    bx(Machine, 0.6, 0.8, 1.1, 0x064e3b, 1.2, 0.4, 0);
 
     // Headstock Gearbox Unit
     bx(Machine, 0.9, 0.8, 0.9, 0x047857, -1.0, 1.2, 0);
-    cy(Machine, 0.05, 0.2, 0x94a3b8, -1.2, 1.45, 0.46).rotation.x = PI / 2; // Gear lever
+    cy(Machine, 0.05, 0.2, 0x94a3b8, -1.2, 1.45, 0.46).rotation.x = PI / 2;
 
-    // 3-Jaw Spindle Chuck (Animated during rotation!)
+    // 3-Jaw Spindle Chuck (Rotates based on VFD live RPM!)
     const ChuckGroup = new THREE.Group();
     ChuckGroup.position.set(-0.45, 1.2, 0);
     Machine.add(ChuckGroup);
-    cy(ChuckGroup, 0.26, 0.22, 0xd4d4d8, 0, 0, 0).rotation.z = PI / 2; // Chuck cylinder
-    // 3 Hardened Steel Gripping Jaws
+    cy(ChuckGroup, 0.26, 0.22, 0xd4d4d8, 0, 0, 0).rotation.z = PI / 2;
     [0, 2 * PI / 3, 4 * PI / 3].forEach(a => {
-      const jaw = bx(ChuckGroup, 0.08, 0.12, 0.07, 0x1e293b, 0.12, Math.cos(a) * 0.16, Math.sin(a) * 0.16);
+      bx(ChuckGroup, 0.08, 0.12, 0.07, 0x1e293b, 0.12, Math.cos(a) * 0.16, Math.sin(a) * 0.16);
     });
 
     // Workpiece stock in chuck
     const workStock = cy(ChuckGroup, 0.06, 1.2, 0xf59e0b, 0.6, 0, 0);
     workStock.rotation.z = PI / 2;
 
+    // Turned shoulder groove formed when fed
+    const cutGroove = cy(ChuckGroup, 0.048, 0.35, 0xe2e8f0, 0.45, 0, 0);
+    cutGroove.rotation.z = PI / 2;
+    cutGroove.visible = false;
+
     // Tailstock Assembly on right
     bx(Machine, 0.6, 0.6, 0.7, 0x047857, 1.0, 1.15, 0);
-    cy(Machine, 0.06, 0.35, 0xd4d4d8, 0.65, 1.2, 0).rotation.z = PI / 2; // Quill
-    cy(Machine, 0.15, 0.04, 0x94a3b8, 1.35, 1.2, 0).rotation.z = PI / 2; // Handwheel
+    cy(Machine, 0.06, 0.35, 0xd4d4d8, 0.65, 1.2, 0).rotation.z = PI / 2;
+    cy(Machine, 0.15, 0.04, 0x94a3b8, 1.35, 1.2, 0).rotation.z = PI / 2;
 
-    // ---------- INTERACTIVE MACHINE CONTROLS & SAFETY GUARDS
-    // 1. Transparent Interlocked Safety Guard (`gd`)
-    const GuardG = ob('gd', -0.45, 1.35, 0.1, g => {
-      // Polycarbonate curved transparent shield
-      const sm = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.55, 16, 1, true, -PI/2, PI), new THREE.MeshStandardMaterial({
-        color: 0x38bdf8,
-        transparent: true,
-        opacity: 0.35,
-        roughness: 0.1,
-        metalness: 0.2,
-        side: THREE.DoubleSide
-      }));
-      sm.rotation.z = PI / 2;
-      g.add(sm);
-      // Steel hinge frame & yellow handle
-      bx(g, 0.55, 0.04, 0.04, 0xeab308, 0, 0.36, 0);
-      cy(g, 0.02, 0.14, 0xfacc15, 0, 0.42, 0.1);
+    // ---------------------------------------------------------------------
+    // INTERACTIVE MACHINE COMPONENTS: GUARD, TACHOMETER, E-STOP, SWARF
+    // ---------------------------------------------------------------------
+    // 1. Transparent Polycarbonate Safety Guard with Pivot Hinge (`gd`)
+    const GuardPivot = new THREE.Group();
+    GuardPivot.position.set(-0.45, 1.55, -0.2); // Hinge line
+    GuardPivot.rotation.x = -1.45; // Starts open at 85 degrees
+    Machine.add(GuardPivot);
+
+    const shieldMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.55, 16, 1, true, -PI / 2, PI), new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.35,
+      roughness: 0.1,
+      metalness: 0.2,
+      side: THREE.DoubleSide
+    }));
+    shieldMesh.rotation.z = PI / 2;
+    shieldMesh.position.set(0, -0.2, 0.25);
+    GuardPivot.add(shieldMesh);
+    bx(GuardPivot, 0.55, 0.04, 0.04, 0xeab308, 0, 0.16, 0.25);
+    cy(GuardPivot, 0.02, 0.14, 0xfacc15, 0, 0.22, 0.35);
+
+    const GuardG = ob('gd', -0.45, 1.35, -2.9, g => {
+      // Guard click hitbox
     }, 0.9, 'Safety Guard');
 
-    // 2. Control Console with Buttons
+    // Control Console with 7-Segment Digital RPM Tachometer
     const Console = new THREE.Group();
     Console.position.set(0.2, 1.3, 0.55);
     Machine.add(Console);
-    bx(Console, 0.6, 0.4, 0.15, 0x0f172a, 0, 0, 0);
-    // Digital RPM Readout
-    const rpmBox = bx(Console, 0.28, 0.08, 0.02, 0x000000, 0, 0.1, 0.08);
+    bx(Console, 0.65, 0.42, 0.15, 0x0f172a, 0, 0, 0);
 
-    // Emergency Stop Palm Button (`es`)
-    ob('es', 0.4, 1.3, -2.4, g => {
+    // Interlock Limit Switch Status LED
+    const interlockLED = add(Console, new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 8), Bc(0xef4444)), -0.22, 0.12, 0.08);
+
+    // Live 7-Segment Digital Tachometer Display
+    const tachCanvas = document.createElement('canvas'); tachCanvas.width = 256; tachCanvas.height = 96;
+    const tachCtx = tachCanvas.getContext('2d');
+    const updateTach = rpm => {
+      tachCtx.fillStyle = '#050b14'; tachCtx.fillRect(0, 0, 256, 96);
+      tachCtx.strokeStyle = '#22d3ee'; tachCtx.lineWidth = 3; tachCtx.strokeRect(4, 4, 248, 88);
+      tachCtx.fillStyle = '#38bdf8'; tachCtx.font = 'bold 16px monospace';
+      tachCtx.fillText('SPINDLE TACH', 16, 26);
+      tachCtx.fillStyle = rpm > 0 ? '#22c55e' : '#64748b';
+      tachCtx.font = 'bold 44px monospace';
+      tachCtx.fillText(`${Math.round(rpm)} RPM`, 16, 75);
+    };
+    updateTach(0);
+    const tachTex = new THREE.CanvasTexture(tachCanvas);
+    const tachScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.12), new THREE.MeshBasicMaterial({ map: tachTex }));
+    tachScreen.position.set(0.06, 0.11, 0.08);
+    Console.add(tachScreen);
+
+    // Emergency Stop Palm Button (`es`) with physical button depression
+    const eStopHead = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 16), M(0xdc2626));
+    eStopHead.position.set(0, 0.04, 0);
+    const eStopG = ob('es', 0.4, 1.3, -2.4, g => {
       cy(g, 0.09, 0.04, 0xfacc15, 0, 0, 0); // Yellow collar
-      cy(g, 0.07, 0.06, 0xdc2626, 0, 0.04, 0); // Red mushroom head
+      g.add(eStopHead);
     }, 0.5, 'E-Stop');
 
     // Start Button (Green `go`)
@@ -1384,26 +2219,66 @@
       cy(g, 0.045, 0.04, 0xef4444, 0, 0, 0);
     }, 0.4, 'Stop');
 
-    // 3. Swarf Tray & Cleaning Bench Brush (`clr`)
-    ob('clr', 0.5, 0.95, -2.6, g => {
-      bx(g, 0.12, 0.04, 0.35, 0x854d0e); // Wooden handle
-      bx(g, 0.1, 0.06, 0.18, 0x1e293b, 0, -0.04, -0.06); // Horsehair bristles
-      bx(g, 0.3, 0.02, 0.3, 0x64748b, 0.15, -0.05, 0); // Metal chips
+    // 2. Swarf Chips on Slideways & Bench Brush (`clr`)
+    const swarfGroup = new THREE.Group();
+    swarfGroup.position.set(0, 1.02, 0);
+    Machine.add(swarfGroup);
+    // 3D curly metal shavings
+    for (let i = 0; i < 28; i++) {
+      const chip = add(swarfGroup, new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.008, 6, 10, PI * 1.5), M(0xd4d4d8, { metalness: 0.9 })),
+        (rnd() - 0.5) * 1.6, 0, (rnd() - 0.5) * 0.4);
+      chip.rotation.set(rnd() * PI, rnd() * PI, rnd() * PI);
+    }
+
+    const brushG = ob('clr', 0.5, 0.95, -2.6, g => {
+      bx(g, 0.12, 0.04, 0.35, 0x854d0e);
+      bx(g, 0.1, 0.06, 0.18, 0x1e293b, 0, -0.04, -0.06);
     }, 0.6, 'Bench Brush');
 
-    // 4. Material Stock / Push Stick Feeder Tool (`fd`)
-    ob('fd', -0.1, 1.05, -2.4, g => {
-      bx(g, 0.04, 0.03, 0.45, 0xd97706); // Wooden push stick
-      bx(g, 0.06, 0.05, 0.1, 0xb45309, 0, 0.01, -0.2); // Notched pushing head
+    // 3. Wooden Push Stick Tool (`fd`)
+    const pushStickG = ob('fd', -0.1, 1.05, -2.4, g => {
+      bx(g, 0.04, 0.03, 0.45, 0xd97706);
+      bx(g, 0.06, 0.05, 0.1, 0xb45309, 0, 0.01, -0.2);
     }, 0.6, 'Push Stick');
 
-    // 5. Main Electrical LOTO Disconnect Switch Box (`lk`)
-    ob('lk', -3.5, 1.5, -6.35, g => {
-      bx(g, 0.35, 0.55, 0.2, 0x334155); // Industrial switch enclosure
-      bx(g, 0.08, 0.22, 0.06, 0xdc2626, 0.16, 0.05, 0); // Red throw handle
-      // LOTO Danger Padlock & Hasp
-      bx(g, 0.06, 0.08, 0.04, 0xfacc15, 0.16, -0.08, 0.04);
-      add(g, new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.008, 6, 14), M(0xffffff, { metalness: 0.8 })), 0.16, -0.03, 0.04);
+    // Dynamic Metal Cutting Sparks & Chips Particle System
+    const cutSparkCount = 40;
+    const cutSparkPos = new Float32Array(cutSparkCount * 3);
+    const cutSparkVel = [];
+    for (let i = 0; i < cutSparkCount; i++) {
+      cutSparkPos[i * 3] = 0; cutSparkPos[i * 3 + 1] = 1.2; cutSparkPos[i * 3 + 2] = -3.0;
+      cutSparkVel.push({ x: 0, y: 0, z: 0, life: 0 });
+    }
+    const cutSparkGeom = new THREE.BufferGeometry();
+    cutSparkGeom.setAttribute('position', new THREE.BufferAttribute(cutSparkPos, 3));
+    const cutSparkPoints = new THREE.Points(cutSparkGeom, new THREE.PointsMaterial({
+      color: 0xffa200,
+      size: 0.06,
+      transparent: true,
+      blending: THREE.AdditiveBlending
+    }));
+    cutSparkPoints.visible = false;
+    sc.add(cutSparkPoints);
+
+    // 4. Main Electrical LOTO Disconnect Switch Box (`lk`)
+    const knifeHandle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.22, 0.06), M(0xdc2626));
+    knifeHandle.position.set(0.16, 0.05, 0);
+    const lotoPadlock = new THREE.Group();
+    bx(lotoPadlock, 0.06, 0.08, 0.04, 0xfacc15); // Brass body
+    add(lotoPadlock, new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.008, 6, 14), M(0xffffff, { metalness: 0.9 })), 0, 0.05, 0);
+    lotoPadlock.position.set(0.16, -0.06, 0.06);
+    lotoPadlock.visible = false;
+
+    // OSHA Danger Tag
+    const dangerTag = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.16), new THREE.MeshBasicMaterial({ color: 0xdc2626, side: THREE.DoubleSide }));
+    dangerTag.position.set(0.16, -0.15, 0.06);
+    dangerTag.visible = false;
+
+    const lotoG = ob('lk', -3.5, 1.5, -6.35, g => {
+      bx(g, 0.35, 0.55, 0.2, 0x334155);
+      g.add(knifeHandle);
+      g.add(lotoPadlock);
+      g.add(dangerTag);
     }, 0.8, 'LOTO Disconnect');
 
     // ---------- PPE BENCH
@@ -1426,7 +2301,7 @@
     ob('boots', -2.8, 1.02, 2, g => {
       bx(g, 0.16, 0.18, 0.28, 0x1c1917, -0.1, 0, 0);
       bx(g, 0.16, 0.18, 0.28, 0x1c1917, 0.1, 0, 0);
-      bx(g, 0.14, 0.04, 0.1, 0x78716c, -0.1, -0.06, 0.1); // Steel toe cap
+      bx(g, 0.14, 0.04, 0.1, 0x78716c, -0.1, -0.06, 0.1);
       bx(g, 0.14, 0.04, 0.1, 0x78716c, 0.1, -0.06, 0.1);
     }, 0.7, 'Safety Boots');
 
@@ -1461,18 +2336,124 @@
     heldPushStick.visible = false;
     hR.add(heldPushStick);
 
-    // Interaction Logic
+    // Interactive Proximity Reticle UI Element
+    let reticleEl = document.getElementById('sim-reticle');
+    if (!reticleEl && sw) {
+      reticleEl = document.createElement('div');
+      reticleEl.id = 'sim-reticle';
+      reticleEl.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:15;display:flex;align-items:center;justify-content:center;';
+      reticleEl.innerHTML = `
+        <div id="ret-ring" style="width:24px;height:24px;border:2px solid rgba(56,189,248,0.7);border-radius:50%;transition:transform 0.15s ease, border-color 0.15s ease;"></div>
+        <div id="ret-dot" style="position:absolute;width:4px;height:4px;background:#38bdf8;border-radius:50%;"></div>
+        <div id="ret-badge" style="position:absolute;top:30px;background:rgba(15,23,42,0.92);border:1px solid #38bdf8;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;display:none;"></div>
+      `;
+      sw.appendChild(reticleEl);
+    }
+
+    // ---------------------------------------------------------------------
+    // REAL 3D ANIMATION SYSTEMS: GUARD HINGE, MOTOR INERTIA, SWARF SWEEP
+    // ---------------------------------------------------------------------
+    let currentRpm = 0, targetRpm = 0;
+    let guardAngle = -1.45, targetGuardAngle = -1.45;
+
+    me.toggleGuard = function() {
+      if (st.gd) {
+        targetGuardAngle = -1.45;
+        st.gd = 0;
+        interlockLED.material.color.setHex(0xef4444);
+        AudioFX.latch();
+        if (typeof tip === 'function') tip('🛡️ Chuck guard opened: Spindle interlock OPEN (circuit disabled).');
+      } else {
+        targetGuardAngle = 0.0;
+        st.gd = 1;
+        interlockLED.material.color.setHex(0x22c55e);
+        mark(GuardG);
+        AudioFX.latch();
+        if (typeof tip === 'function') tip('🛡️ Interlock guard closed and latched over chuck (Circuit OK).');
+      }
+      afterM();
+    };
+
+    me.sweepBed = function() {
+      if (!st.es) {
+        if (typeof mist === 'function') mist('seq', '⚠️ Unsafe Sequence', 'Cleared bed before testing Emergency Stop mechanism.', 'Test Emergency Stop trip function first.');
+        return;
+      }
+      AudioFX.brushSweep();
+      // Animate sweeping motion
+      hR.position.x = 0.1;
+      setTimeout(() => {
+        AudioFX.brushSweep();
+        hR.position.x = 0.35;
+      }, 250);
+      setTimeout(() => {
+        AudioFX.brushSweep();
+        hR.position.x = 0.2;
+        // Swarf slides into collection drawer
+        swarfGroup.position.y = 0.55;
+        swarfGroup.position.z = 0.35;
+        st.clr = 1;
+        mark(brushG);
+        if (typeof tip === 'function') tip('🧹 Bed and slideways swept clean of sharp turnings using bench brush.');
+        afterM();
+      }, 500);
+    };
+
+    me.slapEstop = function() {
+      eStopHead.position.y = 0.02; // Button depressed 20mm
+      AudioFX.estop();
+      AudioFX.dynamicBrake();
+      targetRpm = 0;
+      st.running = 0;
+      st.es = 1;
+      mark(eStopG);
+      beaconLight.intensity = 2.5;
+
+      if (st.phase === 'em') {
+        const E = st.em = st.em || { estop: 0, disc: 0, out: 0, t0: Date.now() };
+        E.estop = 1;
+        if (typeof tip === 'function') tip('🛑 EMERGENCY STOP SLAPPED: Spindle dynamic injection brake engaged!');
+        hudM();
+      } else {
+        if (typeof tip === 'function') tip('🛑 E-Stop tested and verified functional. Trip circuit verified.');
+        afterM();
+      }
+    };
+
+    me.feedStock = function() {
+      if (!st.go) {
+        if (typeof tip === 'function') tip('Start the spindle first before advancing material.');
+        return;
+      }
+      AudioFX.sparkSpray(0.6);
+      cutSparkPoints.visible = true;
+
+      // Animate push stick forward stroke
+      heldPushStick.position.z = -0.25;
+      setTimeout(() => {
+        heldPushStick.position.z = -0.1;
+        cutSparkPoints.visible = false;
+        cutGroove.visible = true; // Shoulder groove formed
+        st.fd = 1;
+        mark(pushStickG);
+        if (typeof tip === 'function') tip('🪵 Material fed safely with push stick — hands kept 200mm clear of cutter.');
+        afterM();
+      }, 600);
+    };
+
+    // Interaction Click Handler
     const P = id => {
       if (st.phase === 'em') {
         const E = st.em = st.em || { estop: 0, disc: 0, out: 0, t0: Date.now() };
         if (id === 'es') {
-          E.estop = 1;
-          st.running = 0;
-          if (typeof tip === 'function') tip('🛑 EMERGENCY STOP SLAPPED: Spindle power killed instantly!');
-          if (typeof beep === 'function') beep(900, 0.35);
+          me.slapEstop();
         } else if (id === 'lk') {
           E.disc = 1;
-          if (typeof tip === 'function') tip('Main disconnect opened & locked out.');
+          knifeHandle.rotation.z = -0.8;
+          lotoPadlock.visible = true;
+          dangerTag.visible = true;
+          AudioFX.padlock();
+          if (typeof tip === 'function') tip('Main disconnect opened & locked out with danger padlock.');
         }
         return hudM();
       }
@@ -1482,8 +2463,8 @@
 
       if (id === 'sign1' || id === 'sign2') {
         st.haz.add(id);
+        AudioFX.tone(440, 0.15);
         if (typeof tip === 'function') tip(id === 'sign1' ? 'ROTATING PARTS: Entanglement risk — tie back hair, no loose clothing.' : 'PINCH POINTS: Crush risk — keep hands outside cutter zone.');
-        if (typeof beep === 'function') beep(440, 0.15);
         return afterM();
       }
 
@@ -1491,8 +2472,8 @@
         if (st.worn) return tip && tip('PPE already equipped.');
         st.pick.add(id);
         mark(g);
+        AudioFX.tone(520, 0.1);
         if (typeof tip === 'function') tip(NM[id] + ' ready (' + st.pick.size + '/3).');
-        if (typeof beep === 'function') beep(520, 0.1);
         return afterM();
       }
 
@@ -1502,27 +2483,11 @@
       }
 
       if (id === 'gd') {
-        st.gd = 1;
-        mark(g);
-        // Animate guard lowering down into position
-        GuardG.position.y = 1.25;
-        GuardG.position.z = 0.0;
-        if (typeof tip === 'function') tip('🛡️ Interlock guard closed and latched over chuck.');
-        if (typeof beep === 'function') beep(600, 0.15);
+        me.toggleGuard();
       } else if (id === 'es') {
-        st.es = 1;
-        mark(g);
-        if (typeof tip === 'function') tip('🛑 E-Stop tested and verified functional. Twist-to-reset checked.');
-        if (typeof beep === 'function') beep(640, 0.15);
+        me.slapEstop();
       } else if (id === 'clr') {
-        if (!st.es) {
-          if (typeof mist === 'function') mist('seq', '⚠️ Unsafe Sequence', 'Cleared bed before testing Emergency Stop mechanism.', 'Test Emergency Stop trip function first.');
-          return;
-        }
-        st.clr = 1;
-        mark(g);
-        if (typeof tip === 'function') tip('🧹 Bed and slideways swept clean of sharp turnings using bench brush.');
-        if (typeof beep === 'function') beep(680, 0.15);
+        me.sweepBed();
       } else if (id === 'go') {
         if (!st.gd) {
           if (typeof mist === 'function') mist('iso', '⚠️ Guard Interlock Open', 'Attempted to start machine with safety interlock guard open.', 'Close and latch the transparent chuck guard first.');
@@ -1534,19 +2499,14 @@
         }
         st.go = 1;
         st.running = 1;
+        targetRpm = 1250;
         mark(g);
         heldPushStick.visible = true;
-        if (typeof tip === 'function') tip('⚡ Spindle active: 1250 RPM. Acoustic vibration nominal.');
-        if (typeof beep === 'function') beep(740, 0.25);
+        AudioFX.tone(740, 0.25);
+        if (typeof tip === 'function') tip('⚡ Spindle active: VFD accelerating to 1250 RPM. Acoustic vibration nominal.');
+        afterM();
       } else if (id === 'fd') {
-        if (!st.go) {
-          if (typeof tip === 'function') tip('Start the spindle first before advancing material.');
-          return;
-        }
-        st.fd = 1;
-        mark(g);
-        if (typeof tip === 'function') tip('🪵 Material fed safely with push stick — hands kept 200mm clear of cutter.');
-        if (typeof beep === 'function') beep(780, 0.2);
+        me.feedStock();
       } else if (id === 'sp') {
         if (!st.fd) {
           if (typeof tip === 'function') tip('Perform feed pass before completing cycle.');
@@ -1554,22 +2514,26 @@
         }
         st.running = 0;
         st.sp = 1;
+        targetRpm = 0;
         mark(g);
         heldPushStick.visible = false;
-        if (typeof tip === 'function') tip('⏹️ Stop pressed: Spindle spun down to 0 RPM.');
-        if (typeof beep === 'function') beep(600, 0.2);
+        AudioFX.tone(600, 0.2);
+        if (typeof tip === 'function') tip('⏹️ Stop pressed: Spindle coasting down to 0 RPM.');
+        afterM();
       } else if (id === 'lk') {
-        if (!st.sp) {
+        if (!st.sp || currentRpm > 20) {
           if (typeof mist === 'function') mist('iso', '⚠️ Moving Parts Danger', 'Attempted to lock out equipment while spindle was still spinning.', 'Press STOP and wait for zero RPM before isolating power.');
           return;
         }
         st.lk = 1;
         mark(g);
-        if (typeof tip === 'function') tip('🔒 LOTO Verified: Lockout hasp & danger padlock attached to main disconnect.');
-        if (typeof beep === 'function') beep(820, 0.25);
+        knifeHandle.rotation.z = -0.8;
+        lotoPadlock.visible = true;
+        dangerTag.visible = true;
+        AudioFX.padlock();
+        if (typeof tip === 'function') tip('🔒 LOTO Verified: Lockout hasp & danger padlock attached to main disconnect (OSHA 1910.147).');
+        afterM();
       }
-
-      afterM();
     };
 
     me.pick = P;
@@ -1583,8 +2547,8 @@
       });
       st.worn = 1;
       hand.visible = true;
+      AudioFX.tone(880, 0.2);
       if (typeof tip === 'function') tip('🥽 PPE Equipped: Impact eye protection, hearing protection fitted.');
-      if (typeof beep === 'function') beep(880, 0.2);
       afterM();
     };
 
@@ -1593,13 +2557,16 @@
       st.phase = 'em';
       st.em = { estop: 0, disc: 0, out: 0, t0: Date.now() };
       const emv = document.getElementById('emv'); if (emv) emv.classList.add('on');
+      AudioFX.tone(900, 0.35);
+      beaconLight.intensity = 3.0;
       if (typeof tip === 'function') tip('🚨 MACHINE RUNAWAY! Spindle chatter and jam detected. Smash the E-Stop!');
-      if (typeof beep === 'function') beep(900, 0.35);
       hudM();
     };
 
-    // Pointer Events
+    // Pointer Events & Camera Look
     let yaw = 0, pit = 0, dn = null, hov = null;
+    let walkDist = 0;
+
     const rc = new THREE.Raycaster();
     const nd = e => {
       const r = cv.getBoundingClientRect();
@@ -1652,6 +2619,15 @@
       dn = null;
     };
 
+    // Keyboard Shortcuts: G = guard, E = feed
+    const keyHandler = e => {
+      if (e.target.tagName === 'INPUT') return;
+      if (e.key.toLowerCase() === 'g' && me.run) {
+        me.toggleGuard();
+      }
+    };
+    window.addEventListener('keydown', keyHandler);
+
     // Responsive Canvas
     const rs = () => {
       if (!sw.clientWidth) return;
@@ -1662,29 +2638,89 @@
     rs();
     window.onresize = () => { if (me.run) rs(); };
 
-    // Animation Loop (with chuck rotation when running)
+    // ---------------------------------------------------------------------
+    // MAIN 3D SIMULATION ANIMATION LOOP: MOTOR INERTIA & INTERLOCK GUARD
+    // ---------------------------------------------------------------------
     let fl = 0;
     const loop = () => {
-      if (!me.run) { R.setAnimationLoop(null); return; }
+      if (!me.run) {
+        R.setAnimationLoop(null);
+        window.removeEventListener('keydown', keyHandler);
+        return;
+      }
       fl++;
       const kk = window.K || {};
       const f = (kk.w || kk.arrowup ? 1 : 0) - (kk.s || kk.arrowdown ? 1 : 0);
       const r = (kk.d || kk.arrowright ? 1 : 0) - (kk.a || kk.arrowleft ? 1 : 0);
       const sp = 0.08;
 
-      cam.position.x = Math.max(-7, Math.min(7, cam.position.x + (-Math.sin(yaw) * f + Math.cos(yaw) * r) * sp));
-      cam.position.z = Math.max(-6, Math.min(6, cam.position.z + (-Math.cos(yaw) * f - Math.sin(yaw) * r) * sp));
-      cam.rotation.set(pit, yaw, 0);
+      if (f !== 0 || r !== 0) {
+        const dx = (-Math.sin(yaw) * f + Math.cos(yaw) * r) * sp;
+        const dz = (-Math.cos(yaw) * f - Math.sin(yaw) * r) * sp;
+        cam.position.x = Math.max(-7, Math.min(7, cam.position.x + dx));
+        cam.position.z = Math.max(-6, Math.min(6, cam.position.z + dz));
 
-      const s = (typeof st !== 'undefined' && st ? st : window.st);
-      // Rotate spindle chuck when running
-      if (s && s.running) {
-        ChuckGroup.rotation.x += 0.35;
-        if (fl % 25 === 0 && typeof beep === 'function') beep(140 + rnd() * 20, 0.04);
+        walkDist += Math.hypot(dx, dz);
+        if (walkDist > 0.65) {
+          walkDist = 0;
+          AudioFX.step('concrete');
+        }
+        cam.position.y = 1.6 + Math.sin(fl * 0.3) * 0.02;
       }
 
-      // Emergency evacuation check
+      cam.rotation.set(pit, yaw, 0);
+
+      // -------------------------------------------------------------------
+      // VFD MOTOR ACCELERATION & SPINDLE INERTIA
+      // -------------------------------------------------------------------
+      currentRpm += (targetRpm - currentRpm) * 0.055;
+      if (currentRpm > 5) {
+        ChuckGroup.rotation.x += (currentRpm / 1250) * 0.45;
+      }
+
+      // Update 7-Segment Digital Tachometer Display
+      if (fl % 4 === 0) {
+        const displayedRpm = currentRpm > 10 ? currentRpm + (rnd() - 0.5) * 4 : 0;
+        updateTach(displayedRpm);
+        tachTex.needsUpdate = true;
+      }
+
+      // Smooth Interlock Guard Pivot Swing
+      guardAngle += (targetGuardAngle - guardAngle) * 0.18;
+      GuardPivot.rotation.x = guardAngle;
+
+      // -------------------------------------------------------------------
+      // CUTTING SPARK PARTICLES
+      // -------------------------------------------------------------------
+      if (cutSparkPoints.visible) {
+        const sArr = cutSparkGeom.attributes.position.array;
+        for (let i = 0; i < cutSparkCount; i++) {
+          const v = cutSparkVel[i];
+          if (v && v.life > 0) {
+            v.life -= 0.05;
+            sArr[i * 3] += v.x;
+            sArr[i * 3 + 1] += v.y;
+            sArr[i * 3 + 2] += v.z;
+            v.y -= 0.004;
+          } else {
+            sArr[i * 3] = -0.1 + (rnd() - 0.5) * 0.05;
+            sArr[i * 3 + 1] = 1.2 + (rnd() - 0.5) * 0.05;
+            sArr[i * 3 + 2] = -3.0;
+            v.x = (rnd() - 0.5) * 0.03;
+            v.y = rnd() * 0.04 + 0.01;
+            v.z = rnd() * 0.04;
+            v.life = 1.0;
+          }
+        }
+        cutSparkGeom.attributes.position.needsUpdate = true;
+      }
+
+      // Emergency Evacuation & Strobe Sweep
+      const s = (typeof st !== 'undefined' && st ? st : window.st);
       if (s && s.phase === 'em') {
+        beaconLight.intensity = Math.sin(fl * 0.3) > 0 ? 3.0 : 0.4;
+        beaconDome.material.color.setHex(Math.sin(fl * 0.3) > 0 ? 0xf59e0b : 0x78350f);
+
         const E = s.em;
         if (E && E.estop && cam.position.x > 5 && cam.position.z > 5) {
           E.out = 1;
@@ -1696,10 +2732,38 @@
         }
       }
 
+      // -------------------------------------------------------------------
+      // IN-WORLD PROXIMITY RETICLE & FLOATING PROMPTS
+      // -------------------------------------------------------------------
+      if (reticleEl) {
+        const badge = document.getElementById('ret-badge');
+        const ring = document.getElementById('ret-ring');
+        let closestObj = null, minDist = 999;
+        objs.forEach(o => {
+          const d = cam.position.distanceTo(o.position);
+          if (d < minDist) { minDist = d; closestObj = o; }
+        });
+
+        if (closestObj && minDist < 3.0) {
+          if (ring) { ring.style.transform = 'scale(1.35)'; ring.style.borderColor = '#22c55e'; }
+          if (badge) {
+            badge.style.display = 'block';
+            const actionPrompt = closestObj.userData.id === 'fd' ? '[E] Push Stock' :
+                                 closestObj.userData.id === 'gd' ? '[G] Toggle Guard' :
+                                 `[E] ${NM[closestObj.userData.id] || closestObj.userData.id}`;
+            badge.textContent = `${actionPrompt} (${minDist.toFixed(1)}m)`;
+          }
+        } else {
+          if (ring) { ring.style.transform = 'scale(1)'; ring.style.borderColor = 'rgba(56,189,248,0.7)'; }
+          if (badge) badge.style.display = 'none';
+        }
+      }
+
       R.render(sc, cam);
     };
 
     R.setAnimationLoop(loop);
+
     if (typeof mkCoach === 'function') {
       mkCoach({
         steps: MSTEPS,
@@ -1728,5 +2792,5 @@
     if (typeof tip === 'function') tip('Welcome to Machine Operation. Read the warning signs on the wall.');
   };
 
-  console.log("[SkillSafe VR] 3D Workshops Extension (Construction Safety & Machine Operation) loaded.");
+  console.log("[SkillSafe VR] 3D Workshops Extension (Construction Safety & Machine Operation) v7.0 loaded.");
 })();
